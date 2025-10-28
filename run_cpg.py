@@ -44,6 +44,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 from env.hopf_network import HopfNetwork
 from env.quadruped_gym_env import QuadrupedGymEnv
+from env.quadruped import Quadruped as quad
 
 ADD_CARTESIAN_PD = True
 TIME_STEP = 0.001
@@ -89,18 +90,21 @@ for j in range(TEST_STEPS):
   dq = env.robot.GetMotorVelocities() # [FR_HIP, FR_THIGH, FR_CALF, FL_HIP, FR_THIGH, FL_CALF, FL_HIP, RL_THIGH, RL_CALF, RR_HIP, RR_THIGH, RR_CALF,]
 
   # loop through desired foot positions and calculate torques
-  for i in range(4):
+  for current_leg in range(4):
     # initialize torques for legi
     tau = np.zeros(3)
 
     # get desired foot i pos (xi, yi, zi) in leg frame
-    leg_xyz = np.array([xs[i], sideSign[i] * foot_y, zs[i]])
+    leg_xyz = np.array([xs[current_leg], sideSign[current_leg] * foot_y, zs[current_leg]])
 
     # call inverse kinematics to get corresponding joint angles (see ComputeInverseKinematics() in quadruped.py)
-    leg_q = np.zeros(3) # [TODO] 
+    # [TODO] MATAS done
+    leg_q = quad.ComputeInverseKinematics(legID=current_leg, leg_xyz=leg_xyz)
 
     # Add joint PD contribution to tau for leg i (Equation 4)
-    tau += np.zeros(3) # [TODO] 
+     # [TODO] MATAS done
+    # τ_joint = Kp_joint(qd − q) + Kd_joint(dqd − dq) 
+    tau += kp @ (leg_q - q) + kd @ (-dq)
 
     # add Cartesian PD contribution
     if ADD_CARTESIAN_PD:
@@ -117,7 +121,7 @@ for j in range(TEST_STEPS):
       tau += np.zeros(3) # [TODO]
 
     # Set tau for legi in action vector
-    action[3*i:3*i+3] = tau
+    action[3*current_leg:3*current_leg+3] = tau
 
   # send torques to robot and simulate TIME_STEP seconds 
   env.step(action) 
