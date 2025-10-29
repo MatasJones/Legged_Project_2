@@ -64,7 +64,7 @@ class HopfNetwork():
                 ):
     
     # initialize CPG data structures: amplitude is row 0, and phase is row 1
-    self.X = np.zeros((2,4))
+    self.X = np.zeros((2,4)) # [[amp_FR, phase_FR], [amp_FL, phase_FL], [amp_RR, phase_RR], [...]]
     self.X_dot = np.zeros((2,4))
 
     # save parameters 
@@ -97,12 +97,37 @@ class HopfNetwork():
 
   def _set_gait(self,gait):
     """ For coupling oscillators in phase space. 
-    [TODO] Update all coupling matrices.
+        Update all coupling matrices.
     """
-    self.PHI_trot = np.zeros((4,4)) # [TODO]
-    self.PHI_walk = np.zeros((4,4)) # [TODO]
-    self.PHI_bound = np.zeros((4,4)) # [TODO]
-    self.PHI_pace = np.zeros((4,4)) # [TODO]
+    # MATAS TODO done
+    # For a trot, FR and RL are in sync and are shifted from RR and FL (which are also in sync) by pi
+    self.PHI_trot = np.array([
+                            [0, 0, np.pi, np.pi],
+                            [0, 0, np.pi, np.pi],
+                            [np.pi, np.pi, 0, 0],
+                            [np.pi, np.pi, 0, 0]
+                            ])
+    
+    self.PHI_walk = np.array([
+                            [0.0, np.pi/2, np.pi, 3*np.pi/2],
+                            [3*np.pi/2, 0.0, np.pi/2, np.pi],
+                            [np.pi, 3*np.pi/2, 0.0, np.pi/2],
+                            [np.pi/2, np.pi, 3*np.pi/2, 0.0]
+                            ])
+    
+    self.PHI_bound = np.array([
+                            [0.0, 0.0, np.pi, np.pi],
+                            [0.0, 0.0, np.pi, np.pi],
+                            [np.pi, np.pi, 0.0, 0.0],
+                            [np.pi, np.pi, 0.0, 0.0]
+                            ])
+    
+    self.PHI_pace = np.array([
+                            [0.0, np.pi, 0.0, np.pi],
+                            [np.pi, 0.0, np.pi, 0.0],
+                            [0.0, np.pi, 0.0, np.pi],
+                            [np.pi, 0.0, np.pi, 0.0]
+                            ])
 
     if gait == "TROT":
       self.PHI = self.PHI_trot
@@ -124,8 +149,18 @@ class HopfNetwork():
       self._integrate_hopf_equations_rl()
     
     # map CPG variables to Cartesian foot xz positions (Equations 8, 9) 
-    x = np.zeros(4) # [TODO]
-    z = np.zeros(4) # [TODO]
+    # TODO MATAS done
+    # x_foot = -d_step * r_i * cos(theta_i)
+    x = -self._des_step_len*self.X[0,:]*np.cos(self.X[1,:])
+    # TODO MATAS done
+    z = np.zeros(4)
+    for i in range(4):
+      sin_theta_i = np.sin(self.X[1,i])
+      if sin_theta_i > 0:
+        z[i] = -self._robot_height + self._ground_clearance*sin_theta_i
+      else:
+        z[i] = -self._robot_height + self._ground_penetration*sin_theta_i
+    
 
     # scale x by step length
     if not self.use_RL:
@@ -144,23 +179,39 @@ class HopfNetwork():
     X_dot = np.zeros((2,4))
 
     # loop through each leg's oscillator
-    for i in range(4):
+    for osc_nb in range(4):
       # get r_i, theta_i from X
-      r, theta = 0, 0 # [TODO]
+      # TODO MATAS done
+      r, theta = X[:,osc_nb]
       # compute r_dot (Equation 6)
-      r_dot = 0 # [TODO]
+      # TODO MATAS done
+      r_dot = self._alpha*(self._mu - r**2)*r
       # determine whether oscillator i is in swing or stance phase to set natural frequency omega_swing or omega_stance (see Section 3)
-      theta_dot = 0 # [TODO]
+      # TODO MATAS done
+      # omega_swing c [0, pi], omega_stance c [pi, 2*pi]
+      if theta < np.pi:
+        freq = self._omega_swing
+      else:
+        freq = self._omega_stance
+
+      theta_dot = freq
 
       # loop through other oscillators to add coupling (Equation 7)
+      # TODO MATAS done
       if self._couple:
-        theta_dot += 0 # [TODO]
+        coupling = 0.0
+        for j in range(4):
+          if j == osc_nb: continue
+          coupling += X[0,j]*self._coupling_strength*np.sin(X[1,j] - X[1,osc_nb] - self.PHI[osc_nb, j])
+
+        theta_dot += coupling
 
       # set X_dot[:,i]
-      X_dot[:,i] = [r_dot, theta_dot]
+      X_dot[:,osc_nb] = [r_dot, theta_dot]
 
     # integrate 
-    self.X = np.zeros((2,4)) # [TODO]
+    # TODO MATAS done
+    self.X += X_dot_prev*self._dt
     self.X_dot = X_dot
     # mod phase variables to keep between 0 and 2pi
     self.X[1,:] = self.X[1,:] % (2*np.pi)

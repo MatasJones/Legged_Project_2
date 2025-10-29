@@ -44,15 +44,14 @@ import matplotlib
 from matplotlib import pyplot as plt
 from env.hopf_network import HopfNetwork
 from env.quadruped_gym_env import QuadrupedGymEnv
-from env.quadruped import Quadruped as quad
 
-ADD_CARTESIAN_PD = True
+ADD_CARTESIAN_PD = False
 TIME_STEP = 0.001
 foot_y = 0.0838 # this is the hip length 
 sideSign = np.array([-1, 1, -1, 1]) # get correct hip sign (body right is negative)
 
 env = QuadrupedGymEnv(render=True,              # visualize
-                    on_rack=False,              # useful for debugging! 
+                    on_rack=True,              # useful for debugging! 
                     isRLGymInterface=False,     # not using RL
                     time_step=TIME_STEP,
                     action_repeat=1,
@@ -99,26 +98,32 @@ for j in range(TEST_STEPS):
 
     # call inverse kinematics to get corresponding joint angles (see ComputeInverseKinematics() in quadruped.py)
     # [TODO] MATAS done
-    leg_q = quad.ComputeInverseKinematics(legID=current_leg, leg_xyz=leg_xyz)
+    leg_q = env.robot.ComputeInverseKinematics(legID=current_leg, xyz_coord=leg_xyz)
 
     # Add joint PD contribution to tau for leg i (Equation 4)
      # [TODO] MATAS done
     # τ_joint = Kp_joint(qd − q) + Kd_joint(dqd − dq) 
-    tau += kp @ (leg_q - q) + kd @ (-dq)
+    dq_i = dq[current_leg*3 : current_leg*3+3]
+    q_i = q[current_leg*3 : current_leg*3+3]
+    tau += kp @ (leg_q - q_i) + kd @ (-dq_i)
 
     # add Cartesian PD contribution
     if ADD_CARTESIAN_PD:
       # Get desired xyz position in leg frame (use ComputeJacobianAndPosition with the joint angles you just found above)
-      # [TODO] 
+      # [TODO] MATAS done
+      _, leg_pd = env.robot.ComputeJacobianAndPosition(current_leg, specific_q=leg_q)
 
       # Get current Jacobian and foot position in leg frame (see ComputeJacobianAndPosition() in quadruped.py)
-      # [TODO] 
+      # [TODO] Matas done
+      J, leg_p = env.robot.ComputeJacobianAndPosition(current_leg)
 
       # Get current foot velocity in leg frame (Equation 2)
-      # [TODO] 
+      # [TODO] MATAS done
+      leg_dp = J @ dq_i
 
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau += np.zeros(3) # [TODO]
+       # [TODO] MATAS done
+      tau += kpCartesian @ (leg_pd - leg_p) + kdCartesian @ (-leg_dp)
 
     # Set tau for legi in action vector
     action[3*current_leg:3*current_leg+3] = tau
