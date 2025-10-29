@@ -45,13 +45,13 @@ from matplotlib import pyplot as plt
 from env.hopf_network import HopfNetwork
 from env.quadruped_gym_env import QuadrupedGymEnv
 
-ADD_CARTESIAN_PD = False
+ADD_CARTESIAN_PD = True
 TIME_STEP = 0.001
 foot_y = 0.0838 # this is the hip length 
 sideSign = np.array([-1, 1, -1, 1]) # get correct hip sign (body right is negative)
 
 env = QuadrupedGymEnv(render=True,              # visualize
-                    on_rack=True,              # useful for debugging! 
+                    on_rack=False,              # useful for debugging! 
                     isRLGymInterface=False,     # not using RL
                     time_step=TIME_STEP,
                     action_repeat=1,
@@ -61,7 +61,17 @@ env = QuadrupedGymEnv(render=True,              # visualize
                     )
 
 # initialize Hopf Network, supply gait
-cpg = HopfNetwork(time_step=TIME_STEP)
+mu = 2 ** 2
+omega_swing = 10 * 2 * np.pi
+omega_stance = 10 * 2 * np.pi
+gait = "PACE"
+alpha = 70
+coupling_strength = 10
+ground_clearance = 0.15   # foot swing height 
+ground_penetration = 0.05 # foot stance penetration into ground 
+robot_height = 0.25        # in nominal case (standing) 
+des_step_len = 0.07
+cpg = HopfNetwork(time_step=TIME_STEP, mu=mu, omega_swing=omega_swing, omega_stance=omega_stance, gait=gait, alpha=alpha, coupling_strength=coupling_strength, ground_clearance=ground_clearance, ground_penetration=ground_penetration, robot_height=robot_height, des_step_len=des_step_len)
 
 TEST_STEPS = int(10 / (TIME_STEP))
 t = np.arange(TEST_STEPS)*TIME_STEP
@@ -70,11 +80,11 @@ t = np.arange(TEST_STEPS)*TIME_STEP
 
 ############## Sample Gains
 # joint PD gains
-kp=np.array([100,100,100])
-kd=np.array([2,2,2])
+kp=np.array([250,250,250])
+kd=np.array([15,15,15])
 
 # Cartesian PD gains
-kpCartesian = np.diag([500]*3)
+kpCartesian = np.diag([300]*3)
 kdCartesian = np.diag([20]*3)
 
 for j in range(TEST_STEPS):
@@ -95,6 +105,7 @@ for j in range(TEST_STEPS):
 
     # get desired foot i pos (xi, yi, zi) in leg frame
     leg_xyz = np.array([xs[current_leg], sideSign[current_leg] * foot_y, zs[current_leg]])
+    # leg_xyz = np.array([0, sideSign[current_leg] * foot_y, -0.25]) # For testing
 
     # call inverse kinematics to get corresponding joint angles (see ComputeInverseKinematics() in quadruped.py)
     # [TODO] MATAS done
@@ -105,7 +116,8 @@ for j in range(TEST_STEPS):
     # τ_joint = Kp_joint(qd − q) + Kd_joint(dqd − dq) 
     dq_i = dq[current_leg*3 : current_leg*3+3]
     q_i = q[current_leg*3 : current_leg*3+3]
-    tau += kp @ (leg_q - q_i) + kd @ (-dq_i)
+
+    tau += kp * (leg_q - q_i) + kd * (-dq_i)
 
     # add Cartesian PD contribution
     if ADD_CARTESIAN_PD:

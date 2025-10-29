@@ -102,10 +102,10 @@ class HopfNetwork():
     # MATAS TODO done
     # For a trot, FR and RL are in sync and are shifted from RR and FL (which are also in sync) by pi
     self.PHI_trot = np.array([
-                            [0, 0, np.pi, np.pi],
-                            [0, 0, np.pi, np.pi],
-                            [np.pi, np.pi, 0, 0],
-                            [np.pi, np.pi, 0, 0]
+                            [0, np.pi, 0, np.pi],
+                            [np.pi, 0, np.pi, 0],
+                            [np.pi, 0, np.pi, 0],
+                            [0, np.pi, 0, np.pi]
                             ])
     
     self.PHI_walk = np.array([
