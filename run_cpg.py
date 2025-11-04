@@ -61,16 +61,17 @@ env = QuadrupedGymEnv(render=True,              # visualize
                     )
 
 # initialize Hopf Network, supply gait
-mu = 2 ** 2
+mu = 1.7 ** 2
 omega_swing = 10 * 2 * np.pi
-omega_stance = 10 * 2 * np.pi
-gait = "PACE"
-alpha = 70
+omega_stance = 18 * 2 * np.pi
+gait = "TROT"
+alpha = 80
 coupling_strength = 10
-ground_clearance = 0.15   # foot swing height 
-ground_penetration = 0.05 # foot stance penetration into ground 
+ground_clearance = 0.17   # foot swing height 
+ground_penetration = 0.085 # foot stance penetration into ground 
 robot_height = 0.25        # in nominal case (standing) 
 des_step_len = 0.07
+
 cpg = HopfNetwork(time_step=TIME_STEP, mu=mu, omega_swing=omega_swing, omega_stance=omega_stance, gait=gait, alpha=alpha, coupling_strength=coupling_strength, ground_clearance=ground_clearance, ground_penetration=ground_penetration, robot_height=robot_height, des_step_len=des_step_len)
 
 TEST_STEPS = int(10 / (TIME_STEP))
@@ -80,12 +81,12 @@ t = np.arange(TEST_STEPS)*TIME_STEP
 
 ############## Sample Gains
 # joint PD gains
-kp=np.array([250,250,250])
+kp=np.array([350,350,350])
 kd=np.array([15,15,15])
 
 # Cartesian PD gains
 kpCartesian = np.diag([300]*3)
-kdCartesian = np.diag([20]*3)
+kdCartesian = np.diag([22]*3)
 
 for j in range(TEST_STEPS):
   # initialize torque array to send to motors
