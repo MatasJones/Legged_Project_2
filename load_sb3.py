@@ -46,27 +46,32 @@ from sys import platform
 from stable_baselines3.common.monitor import load_results 
 from stable_baselines3.common.vec_env import VecNormalize
 from stable_baselines3 import PPO, SAC
-# from stable_baselines3.common.cmd_util import make_vec_env
 from stable_baselines3.common.env_util import make_vec_env # fix for newer versions of stable-baselines3
 
 # utils
 from env.quadruped_gym_env import QuadrupedGymEnv
 from utils.utils import plot_results
-from utils.file_utils import get_latest_model, load_all_results
+from utils.file_utils import get_latest_model, load_all_results, get_sorted_dirs, read_env_config
 
 LEARNING_ALG = "PPO" #"SAC"
 interm_dir = "./logs/intermediate_models/"
-# path to saved models, i.e. interm_dir + '102824115106'
-log_dir = interm_dir + ''
+
+# If you want a specific run, set this to the subdirectory name
+# e.g. RUN_SUBDIR = "velocity_102824115106"
+RUN_SUBDIR = None
+
+if RUN_SUBDIR is None:
+    # automatically pick the most recent run
+    run_dirs = get_sorted_dirs(interm_dir)
+    if len(run_dirs) == 0:
+        raise RuntimeError("No run directories found in {}".format(interm_dir))
+    log_dir = run_dirs[-1]
+else:
+    log_dir = os.path.join(interm_dir, RUN_SUBDIR)
+
+print("Using run directory:", log_dir)
 
 # initialize env configs (render at test time)
-# check ideal conditions, as well as robustness to UNSEEN noise during training
-env_config = {}
-env_config['render'] = True
-env_config['record_video'] = False
-env_config['add_noise'] = False 
-
-# get latest model and normalization stats, and plot 
 stats_path = os.path.join(log_dir, "vec_normalize.pkl")
 model_name = get_latest_model(log_dir)
 monitor_results = load_results(log_dir)
@@ -74,9 +79,16 @@ print(monitor_results)
 plot_results([log_dir] , 10e10, 'timesteps', LEARNING_ALG + ' ')
 plt.show() 
 
+# Read env config saved during training and override a few test-time flags
+env_config = read_env_config(log_dir)
+env_config['render'] = True
+env_config['record_video'] = False
+# usually you want deterministic test without extra noise
+env_config['add_noise'] = False 
+
 # reconstruct env 
-env = lambda: QuadrupedGymEnv(**env_config)
-env = make_vec_env(env, n_envs=1)
+make_env_fn = lambda: QuadrupedGymEnv(**env_config)
+env = make_vec_env(make_env_fn, n_envs=1)
 env = VecNormalize.load(stats_path, env)
 env.training = False    # do not update stats at test time
 env.norm_reward = False # reward normalization is not needed at test time
@@ -88,22 +100,75 @@ elif LEARNING_ALG == "SAC":
     model = SAC.load(model_name, env)
 print("\nLoaded model", model_name, "\n")
 
+# reset env
 obs = env.reset()
 episode_reward = 0
 
-# [TODO] initialize arrays to save data from simulation 
+# access underlying QuadrupedGymEnv
+quad_env = env.venv.envs[0].env
 
-for i in range(2000):
-    action, _states = model.predict(obs,deterministic=False) # sample at test time? ([TODO]: test if the outputs make sense)
-    obs, rewards, dones, info = env.step(action)
-    episode_reward += rewards
-    
-    if dones:
+# ----- Logging buffers -----
+NUM_STEPS = 2000
+time_log      = np.zeros(NUM_STEPS)
+base_pos_log  = np.zeros((NUM_STEPS, 3))
+base_vel_log  = np.zeros((NUM_STEPS, 3))
+base_rpy_log  = np.zeros((NUM_STEPS, 3))
+reward_log    = np.zeros(NUM_STEPS)
+
+for i in range(NUM_STEPS):
+    action, _states = model.predict(obs, deterministic=False) # or True for deterministic
+    obs, rewards, dones, infos = env.step(action)
+    r = rewards[0]
+    episode_reward += r
+
+    # Save logs
+    time_log[i] = quad_env.get_sim_time()
+    base_pos_log[i,:] = quad_env.robot.GetBasePosition()
+    base_vel_log[i,:] = quad_env.robot.GetBaseLinearVelocity()
+    base_rpy_log[i,:] = quad_env.robot.GetBaseOrientationRollPitchYaw()
+    reward_log[i] = r
+
+    if dones[0]:
         print('episode_reward', episode_reward)
-        print('Final base position', info[0]['base_pos'])
+        print('Final base position', infos[0]['base_pos'])
         episode_reward = 0
 
-    # [TODO] save data from current robot states for plots 
-    # To get base position, for example: env.envs[0].env.robot.GetBasePosition() 
-    
-# [TODO] make plots
+# ----- Basic plots -----
+plt.figure()
+plt.plot(time_log, base_pos_log[:,0], label='x')
+plt.plot(time_log, base_pos_log[:,1], label='y')
+plt.plot(time_log, base_pos_log[:,2], label='z')
+plt.xlabel('time [s]')
+plt.ylabel('base position [m]')
+plt.title('Base position over time')
+plt.legend()
+plt.tight_layout()
+
+plt.figure()
+plt.plot(time_log, base_vel_log[:,0], label='vx')
+plt.plot(time_log, base_vel_log[:,1], label='vy')
+plt.plot(time_log, base_vel_log[:,2], label='vz')
+plt.xlabel('time [s]')
+plt.ylabel('base linear velocity [m/s]')
+plt.title('Base linear velocity over time')
+plt.legend()
+plt.tight_layout()
+
+plt.figure()
+plt.plot(time_log, base_rpy_log[:,0], label='roll')
+plt.plot(time_log, base_rpy_log[:,1], label='pitch')
+plt.plot(time_log, base_rpy_log[:,2], label='yaw')
+plt.xlabel('time [s]')
+plt.ylabel('angles [rad]')
+plt.title('Base orientation (roll/pitch/yaw)')
+plt.legend()
+plt.tight_layout()
+
+plt.figure()
+plt.plot(time_log, reward_log)
+plt.xlabel('time [s]')
+plt.ylabel('instant reward')
+plt.title('Instant reward over time')
+plt.tight_layout()
+
+plt.show()
