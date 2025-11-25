@@ -136,6 +136,7 @@ class QuadrupedGymEnv(gym.Env):
       add_noise=True,
       terrain=None,
       test_flagrun=False, 
+      des_vel_x=0.8,
       **kwargs): # any extra arguments from legacy
     """Initialize the quadruped gym environment.
     Args:
@@ -178,10 +179,13 @@ class QuadrupedGymEnv(gym.Env):
     self._is_render = render
     self._is_record_video = record_video
     self._add_noise = add_noise
-    self._using_test_env = test_env
+    self._using_test_env = test_flagrun
     self._test_flagrun = test_flagrun
     self.goal_id = None
     self._terrain = terrain
+    self._slope_pitch = 0.0  # used when terrain == "SLOPES"
+    self._des_vel_x = des_vel_x  # desired forward velocity (m/s) for velocity tasks
+
     if self._add_noise:
       self._observation_noise_stdev = 0.01 #
     else:
@@ -215,6 +219,9 @@ class QuadrupedGymEnv(gym.Env):
   ######################################################################################
   # RL Observation and Action spaces 
   ######################################################################################
+  ######################################################################################
+  # RL Observation and Action spaces 
+  ######################################################################################
   def setupObservationSpace(self):
     """Set up observation space for RL. """
     if self._observation_space_mode == "DEFAULT":
@@ -226,11 +233,62 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([-1.0]*4))) -  OBSERVATION_EPS)
 
     elif self._observation_space_mode == "LR_COURSE_OBS":
-      # [TODO] Set observation upper and lower ranges. What are reasonable limits? 
-      # Note 50 is arbitrary below, you may have more or less
-      # If using CPG-RL, remember to include limits on these
-      observation_high = (np.zeros(50) + OBSERVATION_EPS)
-      observation_low = (np.zeros(50) -  OBSERVATION_EPS)
+      """
+      LR_COURSE_OBS (50 dims):
+        0-11   : joint positions q
+        12-23  : joint velocities dq
+        24     : base height z
+        25-27  : base roll, pitch, yaw
+        28-30  : base linear velocity (x,y,z)
+        31-33  : base angular velocity (wx, wy, wz)
+        34-37  : foot contact booleans (FR, FL, RR, RL)
+        38-49  : previous action (12D, in [-1,1])
+      """
+      joint_pos_high = self._robot_config.UPPER_ANGLE_JOINT
+      joint_pos_low  = self._robot_config.LOWER_ANGLE_JOINT
+
+      joint_vel_high = self._robot_config.VELOCITY_LIMITS
+      joint_vel_low  = -self._robot_config.VELOCITY_LIMITS
+
+      base_height_high = np.array([1.0])
+      base_height_low  = np.array([0.0])
+
+      rpy_high = np.array([np.pi, np.pi, np.pi])
+      rpy_low  = -rpy_high
+
+      base_lin_vel_high = np.array([3.0, 3.0, 3.0])
+      base_lin_vel_low  = -base_lin_vel_high
+
+      base_ang_vel_high = np.array([10.0, 10.0, 10.0])
+      base_ang_vel_low  = -base_ang_vel_high
+
+      foot_contact_high = np.ones(4)
+      foot_contact_low  = np.zeros(4)
+
+      prev_action_high  = np.ones(self._action_dim)
+      prev_action_low   = -np.ones(self._action_dim)
+
+      observation_high = (np.concatenate((
+                              joint_pos_high,
+                              joint_vel_high,
+                              base_height_high,
+                              rpy_high,
+                              base_lin_vel_high,
+                              base_ang_vel_high,
+                              foot_contact_high,
+                              prev_action_high
+                            )) + OBSERVATION_EPS)
+
+      observation_low = (np.concatenate((
+                             joint_pos_low,
+                             joint_vel_low,
+                             base_height_low,
+                             rpy_low,
+                             base_lin_vel_low,
+                             base_ang_vel_low,
+                             foot_contact_low,
+                             prev_action_low
+                           )) - OBSERVATION_EPS)
     
     else:
       raise ValueError("observation space not defined or not intended")
@@ -256,16 +314,42 @@ class QuadrupedGymEnv(gym.Env):
                                           self.robot.GetMotorVelocities(),
                                           self.robot.GetBaseOrientation() ))
     elif self._observation_space_mode == "LR_COURSE_OBS":
-      # [TODO] Get observation from robot. What are reasonable measurements we could get on hardware?
-      # if using the CPG, you can include states with self._cpg.get_r(), for example
-      # 50 is arbitrary
-      self._observation = np.zeros(50)
+      # Joint states
+      q = self.robot.GetMotorAngles()
+      dq = self.robot.GetMotorVelocities()
+
+      # Base states
+      base_pos = self.robot.GetBasePosition()
+      base_rpy = self.robot.GetBaseOrientationRollPitchYaw()
+      base_lin_vel = self.robot.GetBaseLinearVelocity()
+      base_ang_vel = self.robot.GetBaseAngularVelocity()
+
+      # Foot contacts (boolean per foot)
+      _, _, _, feetInContactBool = self.robot.GetContactInfo()
+
+      # Previous action (in [-1,1] before scaling to motors)
+      if hasattr(self, "_last_action"):
+        last_action = self._last_action
+      else:
+        last_action = np.zeros(self._action_dim)
+
+      self._observation = np.concatenate((
+                              q,
+                              dq,
+                              np.array([base_pos[2]]),
+                              base_rpy,
+                              base_lin_vel,
+                              base_ang_vel,
+                              np.array(feetInContactBool),
+                              last_action
+                            ))
     else:
       raise ValueError("observation space not defined or not intended")
 
     self._add_obs_noise = (np.random.normal(scale=self._observation_noise_stdev, size=self._observation.shape) *
           self.observation_space.high)
     return self._observation
+
 
   def _noisy_observation(self):
     self._get_observation()
@@ -303,29 +387,40 @@ class QuadrupedGymEnv(gym.Env):
 
   def _reward_fwd_locomotion(self, des_vel_x=None):
     """Learn forward locomotion at a desired velocity. """
-    vel_tracking_reward = 0.1 * np.clip(self.robot.GetBaseLinearVelocity()[0], 0.2, 1.0)
-    # If you want to track a desired velocity 
-    # vel_tracking_reward = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2 )
-    
+    v_x = self.robot.GetBaseLinearVelocity()[0]
+
+    if des_vel_x is None:
+      # Simple "go forward" reward, saturated
+      vel_tracking_reward = 0.1 * np.clip(v_x, 0.0, MAX_FWD_VELOCITY)
+    else:
+      # Velocity tracking around desired speed (Gaussian-shaped)
+      vel_err = v_x - des_vel_x
+      vel_tracking_reward = 1.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
+
     # minimize yaw (go straight)
-    yaw_reward = -0.2 * np.abs(self.robot.GetBaseOrientationRollPitchYaw()[2]) 
+    yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
+    yaw_reward = -0.2 * np.abs(yaw) 
     
     # don't drift laterally 
     drift_reward = -0.01 * abs(self.robot.GetBasePosition()[1]) 
     
     # minimize energy 
     energy_reward = 0 
-
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
       energy_reward += np.abs(np.dot(tau,vel)) * self._time_step
+
+    # penalize deviation from upright quaternion
+    orient_quat = self.robot.GetBaseOrientation()
+    orient_penalty = 0.1 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
 
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
             - 0.01 * energy_reward \
-            - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
+            - orient_penalty
 
     return max(reward,0) # keep rewards positive
+
 
   def get_distance_and_angle_to_goal(self):
     """ Helper to return distance and angle to current goal location. """
@@ -370,21 +465,61 @@ class QuadrupedGymEnv(gym.Env):
     return max(reward,0) # keep rewards positive
     
   def _reward_lr_course(self):
-    """ Implement your reward function here. How will you improve upon the above? """
-    # [TODO] add your reward function. 
-    
-    return 0
+    """Reward for task-specific locomotion on slopes (LR_COURSE_TASK).
+
+    Goal: track a desired forward velocity while staying stable and efficient.
+    """
+    base_pos = self.robot.GetBasePosition()
+    base_lin_vel = self.robot.GetBaseLinearVelocity()
+    roll, pitch, yaw = self.robot.GetBaseOrientationRollPitchYaw()
+    _, _, _, feetInContactBool = self.robot.GetContactInfo()
+
+    v_x = base_lin_vel[0]
+    des_vel = self._des_vel_x
+
+    # Velocity tracking term (Gaussian around desired speed)
+    vel_err = v_x - des_vel
+    vel_tracking = np.exp(-(vel_err**2) / (2 * 0.3**2))
+
+    # Bonus just for moving forward
+    forward_bonus = 0.1 * np.clip(v_x, 0.0, MAX_FWD_VELOCITY)
+
+    # On slopes: pitch should roughly follow the slope angle, roll and yaw near zero
+    pitch_error = pitch - self._slope_pitch
+    orient_penalty = 0.2 * (np.abs(roll) + np.abs(pitch_error) + np.abs(yaw))
+
+    # Stay near the center of the walkway (small lateral y)
+    lateral_penalty = 0.05 * np.abs(base_pos[1])
+
+    # Encourage having feet in contact (stability) but not too much weight shift
+    contact_term = 0.05 * (np.sum(feetInContactBool) / 4.0)
+
+    # Energy penalty
+    energy = 0.0
+    for tau, vel in zip(self._dt_motor_torques, self._dt_motor_velocities):
+      energy += np.abs(np.dot(tau, vel)) * self._time_step
+
+    reward = 1.5 * vel_tracking \
+             + forward_bonus \
+             + contact_term \
+             - orient_penalty \
+             - lateral_penalty \
+             - 0.001 * energy
+
+    return max(reward, 0.0)
+
 
   def _reward(self):
     """ Get reward depending on task"""
     if self._TASK_ENV == "FWD_LOCOMOTION":
-      return self._reward_fwd_locomotion()
+      return self._reward_fwd_locomotion(des_vel_x=self._des_vel_x)
     elif self._TASK_ENV == "LR_COURSE_TASK":
       return self._reward_lr_course()
     elif self._TASK_ENV == "FLAGRUN":
       return self._reward_flag_run()
     else:
       raise ValueError("This task mode not implemented yet.")
+
 
   ######################################################################################
   # Step simulation, map policy network actions to joint commands, etc. 
@@ -411,7 +546,6 @@ class QuadrupedGymEnv(gym.Env):
     new_a = lower_lim + 0.5 * (action + 1) * (upper_lim - lower_lim)
     
     return np.clip(new_a, lower_lim, upper_lim)
-
 
   def ScaleActionToCartesianPos(self,actions):
     """Scale RL action to Cartesian PD ranges. 
@@ -457,7 +591,6 @@ class QuadrupedGymEnv(gym.Env):
 
     return action
 
-
   def ScaleActionToCPGStateModulations(self,actions):
     """Scale RL action to CPG modulation parameters."""
     # clip RL actions to be between -1 and 1 (standard RL technique)
@@ -481,6 +614,9 @@ class QuadrupedGymEnv(gym.Env):
     # get motor kp and kd gains (can be modified)
     kp = self._robot_config.MOTOR_KP # careful of size!
     kd = self._robot_config.MOTOR_KD
+
+    kpCartesian = self._robot_config.kpCartesian
+    kdCartesian = self._robot_config.kdCartesian
     
     # get current motor velocities
     q = self.robot.GetMotorAngles()
@@ -494,14 +630,20 @@ class QuadrupedGymEnv(gym.Env):
       y = sideSign[i] * foot_y # careful of sign
       z = zs[i]
 
+      p_des = np.array([x,y,z])
+
+      J, leg_pose = self.robot.ComputeJacobianAndPosition(i)
+
       # call inverse kinematics to get corresponding joint angles
-      q_des = np.zeros(3) # [TODO]
+      q_des = self.robot.ComputeInverseKinematics(i, p_des)
       
       # Add joint PD contribution to tau
-      tau = np.zeros(3) # [TODO] 
+      tau = kp * (q_des - q) + kd * (-dq)
+
+      v = J @ dq[3*i:3*i+3]
 
       # add Cartesian PD contribution (as you wish)
-      # tau +=
+      tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
       
       action[3*i:3*i+3] = tau
 
@@ -948,6 +1090,7 @@ class QuadrupedGymEnv(gym.Env):
 
   def add_slopes(self, pitch=0.2):
     """Add slopes with platform in center."""
+    self._slope_pitch = pitch
     y = 6
     slope_len = 2
     box_width = 1

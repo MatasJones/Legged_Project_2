@@ -42,10 +42,10 @@ from .utils import plot_curves, ts2xy
 def write_env_config(destination_directory, vec_env, updated_config=None):
 	"""Write configurations to file. """
 	try:
-		signature = inspect.getargspec(vec_env.venv.envs[0].env.__init__)
+		signature = inspect.getfullargspec(vec_env.venv.envs[0].env.__init__)
 	except:
 		# not using vec env
-		signature = inspect.getargspec(vec_env.__init__)
+		signature = inspect.getfullargspec(vec_env.__init__)
 	#print('signature', signature)
 	#print('config', os.path.join(destination_directory,"env_configs.txt"))
 	with open(os.path.join(destination_directory,"env_configs.txt"),"w") as outfile:
