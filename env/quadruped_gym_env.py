@@ -412,6 +412,7 @@ class QuadrupedGymEnv(gym.Env):
     
     return np.clip(new_a, lower_lim, upper_lim)
 
+
   def ScaleActionToCartesianPos(self,actions):
     """Scale RL action to Cartesian PD ranges. 
     Edit ranges, limits etc., but make sure to use Cartesian PD to compute the torques. 
@@ -436,23 +437,26 @@ class QuadrupedGymEnv(gym.Env):
     action = np.zeros(12)
     for i in range(4):
       # get Jacobian and foot position in leg frame for leg i (see ComputeJacobianAndPosition() in quadruped.py)
-      # [TODO]
-      
+      # [TODO] MATAS DONE
+      J, p = self.robot.ComputeJacobianAndPosition(i)
       # desired foot position i (from RL above)
-      pd = np.zeros(3) # [TODO]
+      pd = des_foot_pos[3*i:3*i + 3]
       
       # desired foot velocity i
-      vd = np.zeros(3) # [TODO]
+      # [TODO] MATAS DONE
+      vd = np.zeros(3) 
       
       # foot velocity in leg frame i (Equation 2)
-      # [TODO]
+      # [TODO] MATAS DONE
+      v = J @ dq[i*3 : i*3+3]
       
       # calculate torques with Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau = np.zeros(3) # [TODO]
+      tau = kpCartesian @ (pd - p) + kdCartesian @ (vd - v)
 
       action[3*i:3*i+3] = tau
 
     return action
+
 
   def ScaleActionToCPGStateModulations(self,actions):
     """Scale RL action to CPG modulation parameters."""
