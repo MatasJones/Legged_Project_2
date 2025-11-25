@@ -38,7 +38,7 @@ import os
 from datetime import datetime
 
 # stable baselines 3
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.env_util import make_vec_env
 
@@ -49,10 +49,10 @@ from utils.file_utils import get_latest_model, write_env_config
 # gym environment
 from env.quadruped_gym_env import QuadrupedGymEnv
 
-LEARNING_ALG = "PPO" # or "SAC"
+LEARNING_ALG = "SAC" # or "SAC"
 LOAD_NN = False      # if you want to initialize training with a previous model 
-NUM_ENVS = 1         # how many pybullet environments to create for data collection
-USE_GPU = False      # make sure to install all necessary drivers 
+NUM_ENVS = 12         # how many pybullet environments to create for data collection
+USE_GPU = True      # make sure to install all necessary drivers 
 
 # -----------------------------------------------------------
 # High-level switch between the two policies you want:
@@ -108,14 +108,16 @@ checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,
 # create Vectorized gym environment
 make_env_fn = lambda: QuadrupedGymEnv(**env_configs)
 
+vec_env_cls = SubprocVecEnv if NUM_ENVS > 1 else DummyVecEnv
+
 if LOAD_NN:
     # Create env shell, then load VecNormalize stats
-    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS)
+    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
     env = VecNormalize.load(stats_path, env)
     env.training = True
     env.norm_reward = False
 else:
-    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS)
+    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
     # normalize observations to stabilize learning
     env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
@@ -147,13 +149,13 @@ ppo_config = {  "gamma":0.99,
 
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
 sac_config={"learning_rate":1e-4,
-            "buffer_size":300000,
-            "batch_size":256,
+            "buffer_size":1000000,
+            "batch_size":2048,
             "ent_coef":'auto', 
             "gamma":0.99, 
             "tau":0.005,
-            "train_freq":1, 
-            "gradient_steps":1,
+            "train_freq":100, 
+            "gradient_steps":100,
             "learning_starts": 10000,
             "verbose":1, 
             "tensorboard_log":None,
