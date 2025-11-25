@@ -46,7 +46,7 @@ from env.hopf_network import HopfNetwork
 from env.quadruped_gym_env import QuadrupedGymEnv
 
 ADD_CARTESIAN_PD = True
-TIME_STEP = 0.001
+TIME_STEP = 0.0001
 foot_y = 0.0838 # this is the hip length 
 sideSign = np.array([-1, 1, -1, 1]) # get correct hip sign (body right is negative)
 
@@ -61,7 +61,18 @@ env = QuadrupedGymEnv(render=True,              # visualize
                     )
 
 # initialize Hopf Network, supply gait
-cpg = HopfNetwork(time_step=TIME_STEP)
+mu = 1.7 ** 2
+omega_swing = 10 * 2 * np.pi
+omega_stance = 18 * 2 * np.pi
+gait = "TROT"
+alpha = 80
+coupling_strength = 10
+ground_clearance = 0.17   # foot swing height 
+ground_penetration = 0.085 # foot stance penetration into ground 
+robot_height = 0.25        # in nominal case (standing) 
+des_step_len = 0.07
+
+cpg = HopfNetwork(time_step=TIME_STEP, mu=mu, omega_swing=omega_swing, omega_stance=omega_stance, gait=gait, alpha=alpha, coupling_strength=coupling_strength, ground_clearance=ground_clearance, ground_penetration=ground_penetration, robot_height=robot_height, des_step_len=des_step_len)
 
 TEST_STEPS = int(10 / (TIME_STEP))
 t = np.arange(TEST_STEPS)*TIME_STEP
@@ -70,12 +81,12 @@ t = np.arange(TEST_STEPS)*TIME_STEP
 
 ############## Sample Gains
 # joint PD gains
-kp=np.array([100,100,100])
-kd=np.array([2,2,2])
+kp=np.array([350,350,350])
+kd=np.array([15,15,15])
 
 # Cartesian PD gains
-kpCartesian = np.diag([500]*3)
-kdCartesian = np.diag([20]*3)
+kpCartesian = np.diag([300]*3)
+kdCartesian = np.diag([22]*3)
 
 for j in range(TEST_STEPS):
   # initialize torque array to send to motors
@@ -85,39 +96,50 @@ for j in range(TEST_STEPS):
   xs,zs = cpg.update()
 
   # [TODO] get current motor angles and velocities for joint PD, see GetMotorAngles(), GetMotorVelocities() in quadruped.py
-  # q = env.robot.GetMotorAngles()
-  # dq = env.robot.GetMotorVelocities()
+  q = env.robot.GetMotorAngles()
+  dq = env.robot.GetMotorVelocities() # [FR_HIP, FR_THIGH, FR_CALF, FL_HIP, FR_THIGH, FL_CALF, FL_HIP, RL_THIGH, RL_CALF, RR_HIP, RR_THIGH, RR_CALF,]
 
   # loop through desired foot positions and calculate torques
-  for i in range(4):
+  for current_leg in range(4):
     # initialize torques for legi
     tau = np.zeros(3)
 
     # get desired foot i pos (xi, yi, zi) in leg frame
-    leg_xyz = np.array([xs[i], sideSign[i] * foot_y, zs[i]])
+    leg_xyz = np.array([xs[current_leg], sideSign[current_leg] * foot_y, zs[current_leg]])
+    # leg_xyz = np.array([0, sideSign[current_leg] * foot_y, -0.25]) # For testing
 
     # call inverse kinematics to get corresponding joint angles (see ComputeInverseKinematics() in quadruped.py)
-    leg_q = np.zeros(3) # [TODO] 
+    # [TODO] MATAS done
+    leg_q = env.robot.ComputeInverseKinematics(legID=current_leg, xyz_coord=leg_xyz)
 
     # Add joint PD contribution to tau for leg i (Equation 4)
-    tau += np.zeros(3) # [TODO] 
+     # [TODO] MATAS done
+    # τ_joint = Kp_joint(qd − q) + Kd_joint(dqd − dq) 
+    dq_i = dq[current_leg*3 : current_leg*3+3]
+    q_i = q[current_leg*3 : current_leg*3+3]
+
+    tau += kp * (leg_q - q_i) + kd * (-dq_i)
 
     # add Cartesian PD contribution
     if ADD_CARTESIAN_PD:
       # Get desired xyz position in leg frame (use ComputeJacobianAndPosition with the joint angles you just found above)
-      # [TODO] 
+      # [TODO] MATAS done
+      _, leg_pd = env.robot.ComputeJacobianAndPosition(current_leg, specific_q=leg_q)
 
       # Get current Jacobian and foot position in leg frame (see ComputeJacobianAndPosition() in quadruped.py)
-      # [TODO] 
+      # [TODO] Matas done
+      J, leg_p = env.robot.ComputeJacobianAndPosition(current_leg)
 
       # Get current foot velocity in leg frame (Equation 2)
-      # [TODO] 
+      # [TODO] MATAS done
+      leg_dp = J @ dq_i
 
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau += np.zeros(3) # [TODO]
+       # [TODO] MATAS done
+      tau += kpCartesian @ (leg_pd - leg_p) + kdCartesian @ (-leg_dp)
 
     # Set tau for legi in action vector
-    action[3*i:3*i+3] = tau
+    action[3*current_leg:3*current_leg+3] = tau
 
   # send torques to robot and simulate TIME_STEP seconds 
   env.step(action) 

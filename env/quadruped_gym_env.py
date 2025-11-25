@@ -571,19 +571,21 @@ class QuadrupedGymEnv(gym.Env):
     action = np.zeros(12)
     for i in range(4):
       # get Jacobian and foot position in leg frame for leg i (see ComputeJacobianAndPosition() in quadruped.py)
-      # [TODO]
-      
+      # [TODO] MATAS DONE
+      J, p = self.robot.ComputeJacobianAndPosition(i)
       # desired foot position i (from RL above)
-      pd = np.zeros(3) # [TODO]
+      pd = des_foot_pos[i]
       
       # desired foot velocity i
-      vd = np.zeros(3) # [TODO]
+      # [TODO] MATAS done
+      vd = np.zeros(3) 
       
       # foot velocity in leg frame i (Equation 2)
-      # [TODO]
+      # [TODO] 
+      v = J @ self.robot.GetMotorVelocities[i]
       
       # calculate torques with Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau = np.zeros(3) # [TODO]
+      tau = kpCartesian @ (pd - p) + kdCartesian @ (vd - v)
 
       action[3*i:3*i+3] = tau
 
