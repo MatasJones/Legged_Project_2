@@ -67,7 +67,7 @@ env_configs = {
 }
 
 
-if USE_GPU and LEARNING_ALG=="SAC":
+if USE_GPU:
     gpu_arg = "auto" 
 else:
     gpu_arg = "cpu"
