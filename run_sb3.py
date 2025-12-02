@@ -116,7 +116,7 @@ if __name__ == '__main__':
         "n_steps": n_steps_per_env, 
         "ent_coef": 0.0, 
         "learning_rate": 1e-4, 
-        "vf_coef": 0.8,
+        "vf_coef": 0.5,
         "max_grad_norm": 0.5, 
         "gae_lambda": 0.95, 
         "batch_size": 512,  # Large batch for GPU
