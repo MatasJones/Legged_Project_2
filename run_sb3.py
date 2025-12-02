@@ -76,7 +76,8 @@ if __name__ == '__main__':
         stats_path = os.path.join(log_dir, "vec_normalize.pkl")
         model_name = get_latest_model(log_dir)
 
-    SAVE_PATH = './logs/intermediate_models/{}_{}'.format(
+    ROOT_SAVE_PATH = '/content/drive/MyDrive/QuadrupedRL_Logs/' #For Colab
+    SAVE_PATH = ROOT_SAVE_PATH + '{}_{}'.format(
         TRAINING_TASK.lower(), datetime.now().strftime("%m%d%y%H%M%S")
     ) + '/'
     os.makedirs(SAVE_PATH, exist_ok=True)
