@@ -200,6 +200,9 @@ class QuadrupedGymEnv(gym.Env):
     self._MAX_EP_LEN = EPISODE_LENGTH # max sim time in seconds, arbitrary
     self._action_bound = 1.0
 
+    #MODIFIED
+    self._prev_action = np.zeros(self._action_dim if hasattr(self, '_action_dim') else 12)
+
     # if using CPG
     self.setupCPG()
     self.setupActionSpace()
@@ -680,6 +683,9 @@ class QuadrupedGymEnv(gym.Env):
       if self._is_render:
         self._render_step_helper()
 
+    if hasattr(self, "_last_action"):
+        self._prev_action = self._last_action.copy()
+
     self._last_action = curr_act
     self._env_step_counter += 1
     reward = self._reward()
@@ -779,6 +785,9 @@ class QuadrupedGymEnv(gym.Env):
     self._settle_robot()
     self._last_action = np.zeros(self._action_dim)
     
+    #MODIFIED
+    self._prev_action = np.zeros(self._action_dim)
+
     if self._is_record_video:
       self.recordVideoHelper()
     
