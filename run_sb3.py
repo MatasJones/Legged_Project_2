@@ -20,7 +20,7 @@ from utils.file_utils import get_latest_model, write_env_config
 from env.quadruped_gym_env import QuadrupedGymEnv
 
 # --- GLOBAL CONFIG ---
-LEARNING_ALG = "PPO" 
+LEARNING_ALG = "PPO" #Works
 LOAD_NN = False      
 USE_GPU = True       
 
