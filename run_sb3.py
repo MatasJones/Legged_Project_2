@@ -49,7 +49,7 @@ from utils.file_utils import get_latest_model, write_env_config
 # gym environment
 from env.quadruped_gym_env import QuadrupedGymEnv
 
-LEARNING_ALG = "SAC" # or "SAC"
+LEARNING_ALG = "PPO" # or "SAC"
 LOAD_NN = False      # if you want to initialize training with a previous model 
 NUM_ENVS = 12         # how many pybullet environments to create for data collection
 USE_GPU = True      # make sure to install all necessary drivers 
@@ -95,94 +95,97 @@ if LOAD_NN:
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
-# directory to save policies and normalization parameters
-SAVE_PATH = './logs/intermediate_models/{}_{}'.format(
-    TRAINING_TASK.lower(), datetime.now().strftime("%m%d%y%H%M%S")
-) + '/'
-os.makedirs(SAVE_PATH, exist_ok=True)
+if __name__ == "__main__":
 
-# checkpoint to save policy network periodically
-checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,
-                                         name_prefix='rl_model', verbose=2)
+    # directory to save policies and normalization parameters
+    SAVE_PATH = './logs/intermediate_models/{}_{}'.format(
+        TRAINING_TASK.lower(), datetime.now().strftime("%m%d%y%H%M%S")
+    ) + '/'
+    os.makedirs(SAVE_PATH, exist_ok=True)
 
-# create Vectorized gym environment
-make_env_fn = lambda: QuadrupedGymEnv(**env_configs)
+    # checkpoint to save policy network periodically
+    checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,
+                                            name_prefix='rl_model', verbose=2)
 
-vec_env_cls = SubprocVecEnv if NUM_ENVS > 1 else DummyVecEnv
+    # create Vectorized gym environment
+    make_env_fn = lambda: QuadrupedGymEnv(**env_configs)
 
-if LOAD_NN:
-    # Create env shell, then load VecNormalize stats
-    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
-    env = VecNormalize.load(stats_path, env)
-    env.training = True
-    env.norm_reward = False
-else:
-    env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
-    # normalize observations to stabilize learning
-    env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
+    vec_env_cls = SubprocVecEnv if NUM_ENVS > 1 else DummyVecEnv
 
-# Save environment configuration (for reloading at test time)
-write_env_config(SAVE_PATH, env, updated_config=env_configs)
+    if LOAD_NN:
+        # Create env shell, then load VecNormalize stats
+        env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
+        env = VecNormalize.load(stats_path, env)
+        env.training = True
+        env.norm_reward = False
+    else:
+        env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS,vec_env_cls=vec_env_cls)
+        # normalize observations to stabilize learning
+        env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
-# Multi-layer perceptron (MLP) policy of two layers of size _,_ each with tanh activation function
-policy_kwargs = dict(net_arch=[256,256]) # act_fun=tf.nn.tanh
+    # Save environment configuration (for reloading at test time)
+    write_env_config(SAVE_PATH, env, updated_config=env_configs)
 
-# What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
-n_steps = 4096 
-learning_rate = lambda f: 1e-4 
-ppo_config = {  "gamma":0.99, 
-                "n_steps": int(n_steps/NUM_ENVS), 
-                "ent_coef":0.0, 
-                "learning_rate":learning_rate, 
-                "vf_coef":0.5,
-                "max_grad_norm":0.5, 
-                "gae_lambda":0.95, 
-                "batch_size":128,
-                "n_epochs":10, 
-                "clip_range":0.2, 
-                "clip_range_vf":1,
+    # Multi-layer perceptron (MLP) policy of two layers of size _,_ each with tanh activation function
+    policy_kwargs = dict(net_arch=[256,256]) # act_fun=tf.nn.tanh
+
+    # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
+    n_steps = 4096 
+    learning_rate = lambda f: 1e-4 
+    ppo_config = {  "gamma":0.99, 
+                    "n_steps": int(n_steps/NUM_ENVS), 
+                    "ent_coef":0.0, 
+                    "learning_rate":learning_rate, 
+                    "vf_coef":0.5,
+                    "max_grad_norm":0.5, 
+                    "gae_lambda":0.95, 
+                    "batch_size":128,
+                    "n_epochs":10, 
+                    "clip_range":0.2, 
+                    "clip_range_vf":1,
+                    "verbose":1, 
+                    "tensorboard_log":None, 
+                    "_init_setup_model":True, 
+                    "policy_kwargs":policy_kwargs,
+                    "device": gpu_arg}
+
+    # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
+    sac_config={"learning_rate":1e-4,
+                "buffer_size":1000000,
+                "batch_size":2048,
+                "ent_coef":'auto', 
+                "gamma":0.99, 
+                "tau":0.005,
+                "train_freq":100, 
+                "gradient_steps":100,
+                "learning_starts": 10000,
                 "verbose":1, 
-                "tensorboard_log":None, 
-                "_init_setup_model":True, 
-                "policy_kwargs":policy_kwargs,
+                "tensorboard_log":None,
+                "policy_kwargs": policy_kwargs,
+                "seed":None, 
                 "device": gpu_arg}
 
-# What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
-sac_config={"learning_rate":1e-4,
-            "buffer_size":1000000,
-            "batch_size":2048,
-            "ent_coef":'auto', 
-            "gamma":0.99, 
-            "tau":0.005,
-            "train_freq":100, 
-            "gradient_steps":100,
-            "learning_starts": 10000,
-            "verbose":1, 
-            "tensorboard_log":None,
-            "policy_kwargs": policy_kwargs,
-            "seed":None, 
-            "device": gpu_arg}
-
-if LEARNING_ALG == "PPO":
-    model = PPO('MlpPolicy', env, **ppo_config)
-elif LEARNING_ALG == "SAC":
-    model = SAC('MlpPolicy', env, **sac_config)
-else:
-    raise ValueError(LEARNING_ALG + ' not implemented')
-
-if LOAD_NN:
     if LEARNING_ALG == "PPO":
-        model = PPO.load(model_name, env)
+        model = PPO('MlpPolicy', env, **ppo_config)
     elif LEARNING_ALG == "SAC":
-        model = SAC.load(model_name, env)
-    print("\nLoaded model", model_name, "\n")
+        model = SAC('MlpPolicy', env, **sac_config)
+    else:
+        raise ValueError(LEARNING_ALG + ' not implemented')
 
-# Learn and save (may need to train for longer)
-model.learn(total_timesteps=1000000, log_interval=1, callback=checkpoint_callback)
+    if LOAD_NN:
+        if LEARNING_ALG == "PPO":
+            model = PPO.load(model_name, env)
+        elif LEARNING_ALG == "SAC":
+            model = SAC.load(model_name, env)
+        print("\nLoaded model", model_name, "\n")
 
-# Don't forget to save the VecNormalize statistics when saving the agent
-model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
-env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
+    # Learn and save (may need to train for longer)
+    model.learn(total_timesteps=1000000, log_interval=1, callback=checkpoint_callback)
 
-if LEARNING_ALG == "SAC": # save replay buffer 
-    model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
+    # Don't forget to save the VecNormalize statistics when saving the agent
+    model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
+    env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
+
+    if LEARNING_ALG == "SAC": # save replay buffer 
+        model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
+        
