@@ -398,7 +398,7 @@ class QuadrupedGymEnv(gym.Env):
     else:
       # Velocity tracking around desired speed (Gaussian-shaped)
       vel_err = v_x - des_vel_x
-      vel_tracking_reward = 1.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
+      vel_tracking_reward = 0.5 * np.exp(-(vel_err**2) / (2 * 0.15**2))
 
     # minimize yaw (go straight)
     yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
@@ -423,7 +423,7 @@ class QuadrupedGymEnv(gym.Env):
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
-            - 0.01 * energy_reward \
+            - 0.1 * energy_reward \
             - orient_penalty \
             #+ action_magnitude_penalty \
             #+ action_rate_penalty
