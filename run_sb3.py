@@ -110,17 +110,13 @@ if __name__ == '__main__':
     # With 6 envs, 2048 steps each = 12,288 steps per update.
     # This keeps the GPU busy and reduces CPU interruption.
     n_steps_per_env = 2048 
-
-    INITIAL_LEARNING_RATE = 1e-4 
-    # f is the remaining fraction of the training budget (starts at 1.0, ends at 0.0)
-    learning_rate = lambda f: INITIAL_LEARNING_RATE * f
     
     ppo_config = {  
         "gamma": 0.995, 
         "n_steps": n_steps_per_env, 
         "ent_coef": 0.0, 
-        "learning_rate": learning_rate, 
-        "vf_coef": 0.6,
+        "learning_rate": 1e-4, 
+        "vf_coef": 0.8,
         "max_grad_norm": 0.5, 
         "gae_lambda": 0.95, 
         "batch_size": 512,  # Large batch for GPU
