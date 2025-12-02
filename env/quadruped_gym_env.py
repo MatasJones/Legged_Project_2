@@ -399,10 +399,10 @@ class QuadrupedGymEnv(gym.Env):
 
     # minimize yaw (go straight)
     yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
-    yaw_reward = -0.2 * np.abs(yaw) 
+    yaw_reward = -1.0 * np.abs(yaw) 
     
     # don't drift laterally 
-    drift_reward = -0.01 * abs(self.robot.GetBasePosition()[1]) 
+    drift_reward = -0.5 * abs(self.robot.GetBasePosition()[1]) 
     
     # minimize energy 
     energy_reward = 0 
@@ -411,13 +411,19 @@ class QuadrupedGymEnv(gym.Env):
 
     # penalize deviation from upright quaternion
     orient_quat = self.robot.GetBaseOrientation()
-    orient_penalty = 0.1 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
+    orient_penalty = 1.0 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
+
+    action_magnitude_penalty = -0.1 * np.sum(self._last_action**2)
+
+    action_rate_penalty = -0.5 * np.sum((self._last_action - self._prev_action)**2)
 
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
             - 0.01 * energy_reward \
-            - orient_penalty
+            - orient_penalty \
+            + action_magnitude_penalty \
+            + action_rate_penalty
 
     return max(reward,0) # keep rewards positive
 
