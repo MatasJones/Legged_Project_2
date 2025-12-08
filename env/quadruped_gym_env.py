@@ -433,7 +433,7 @@ class QuadrupedGymEnv(gym.Env):
             #+ action_magnitude_penalty \
             #+ action_rate_penalty
 
-    return max(reward,0) # keep rewards positive
+    return reward #max(reward,0) # keep rewards positive
 
 
   def get_distance_and_angle_to_goal(self):
