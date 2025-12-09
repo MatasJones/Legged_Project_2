@@ -754,7 +754,10 @@ class QuadrupedGymEnv(gym.Env):
       q_des = self.robot.ComputeInverseKinematics(i, p_des)
       
       # Add joint PD contribution to tau
-      tau = kp * (q_des - q) + kd * (-dq)
+      dq_i = dq[i*3 : i*3+3]
+      q_i = q[i*3 : i*3+3]
+
+      tau += kp * (q_des - q_i) + kd * (-dq_i)
 
       v = J @ dq[3*i:3*i+3]
 
