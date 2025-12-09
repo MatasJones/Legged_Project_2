@@ -268,8 +268,8 @@ class QuadrupedGymEnv(gym.Env):
       foot_contact_high = np.ones(4)
       foot_contact_low  = np.zeros(4)
 
-      #prev_action_high  = np.ones(self._action_dim)
-      #prev_action_low   = -np.ones(self._action_dim)
+      prev_action_high  = np.ones(self._action_dim)
+      prev_action_low   = -np.ones(self._action_dim)
 
       observation_high = (np.concatenate((
                               joint_pos_high,
@@ -279,7 +279,7 @@ class QuadrupedGymEnv(gym.Env):
                               base_lin_vel_high,
                               base_ang_vel_high,
                               foot_contact_high,
-                              #prev_action_high
+                              prev_action_high
                             )) + OBSERVATION_EPS)
 
       observation_low = (np.concatenate((
@@ -290,7 +290,7 @@ class QuadrupedGymEnv(gym.Env):
                              base_lin_vel_low,
                              base_ang_vel_low,
                              foot_contact_low,
-                             #prev_action_low
+                             prev_action_low
                            )) - OBSERVATION_EPS)
     
     else:
