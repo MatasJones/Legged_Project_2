@@ -757,7 +757,14 @@ class QuadrupedGymEnv(gym.Env):
       dq_i = dq[i*3 : i*3+3]
       q_i = q[i*3 : i*3+3]
 
-      tau = kp * (q_des - q_i) + kd * (-dq_i)
+      if np.size(kp) == 12:
+        kp_i = kp[3 * i : 3 * i + 3]
+        kd_i = kd[3 * i : 3 * i + 3]
+      else:
+        kp_i = kp
+        kd_i = kd
+
+      tau = kp_i * (q_des - q_i) + kd_i * (-dq_i)
 
       v = J @ dq[3*i:3*i+3]
 
