@@ -61,9 +61,9 @@ TARGET_VELOCITY = 0.8
 
 if TRAINING_TASK == "VELOCITY":
     env_configs = {
-        "motor_control_mode": "PD",
+        "motor_control_mode": "CPG",
         "task_env": "FWD_LOCOMOTION",
-        "observation_space_mode": "LR_COURSE_OBS",
+        "observation_space_mode": "CPG",
         "terrain": None,
         "add_noise": False,
         "des_vel_x": TARGET_VELOCITY,
@@ -186,7 +186,7 @@ if __name__ == '__main__':
             model = SAC.load(model_name, env)
         print("\nLoaded model", model_name, "\n")
 
-    model.learn(total_timesteps=2000000, log_interval=1, callback=checkpoint_callback)
+    model.learn(total_timesteps=1000000, log_interval=1, callback=checkpoint_callback)
 
     model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
     env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 

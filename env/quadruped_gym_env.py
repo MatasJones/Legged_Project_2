@@ -203,6 +203,13 @@ class QuadrupedGymEnv(gym.Env):
     #MODIFIED
     self._prev_action = np.zeros(self._action_dim if hasattr(self, '_action_dim') else 12)
 
+    # CPG-related state for observations (high-level only)
+    self._last_cpg_xs = np.zeros(4)
+    self._last_cpg_zs = np.zeros(4)
+    self._last_omega_rl = np.zeros(4)
+    self._last_mu_rl = np.zeros(4)
+
+
     # if using CPG
     self.setupCPG()
     self.setupActionSpace()
@@ -292,7 +299,39 @@ class QuadrupedGymEnv(gym.Env):
                              foot_contact_low,
                              prev_action_low
                            )) - OBSERVATION_EPS)
-    
+    elif self._observation_space_mode == "CPG":
+      """
+      CPG_ONLY (16 dims):
+        0-3   : CPG x (per leg)
+        4-7   : CPG z (per leg)
+        8-11  : omega_rl (per leg)
+        12-15 : mu_rl (per leg)
+      """
+
+      # bounds for CPG state x,z — tune as needed
+      cpg_xz_high = np.array([0.3] * 8)
+      cpg_xz_low  = -cpg_xz_high
+
+      # omega range = same as ScaleActionToCPGStateModulations
+      omega_high = np.array([4.5 * 2 * np.pi] * 4)
+      omega_low  = np.array([5.0] * 4)
+
+      # mu range = same (MU_LOW**2, MU_UPP**2)
+      mu_high = np.array([MU_UPP**2] * 4)
+      mu_low  = np.array([MU_LOW**2] * 4)
+
+      observation_high = (np.concatenate((
+                              cpg_xz_high,   # x,z (8)
+                              omega_high,    # 4
+                              mu_high        # 4
+                            )) + OBSERVATION_EPS)
+
+      observation_low = (np.concatenate((
+                             cpg_xz_low,
+                             omega_low,
+                             mu_low
+                           )) - OBSERVATION_EPS)
+
     else:
       raise ValueError("observation space not defined or not intended")
 
@@ -345,6 +384,18 @@ class QuadrupedGymEnv(gym.Env):
                               base_ang_vel,
                               np.array(feetInContactBool),
                               last_action
+                            ))
+    elif self._observation_space_mode == "CPG":
+      cpg_x = self._last_cpg_xs
+      cpg_z = self._last_cpg_zs
+      omega = self._last_omega_rl
+      mus   = self._last_mu_rl
+
+      self._observation = np.concatenate((
+                              cpg_x,
+                              cpg_z,
+                              omega,
+                              mus
                             ))
     else:
       raise ValueError("observation space not defined or not intended")
@@ -618,6 +669,13 @@ class QuadrupedGymEnv(gym.Env):
     # integrate CPG, get mapping to foot positions
     xs,zs = self._cpg.update()
 
+    # >>> NEW: store CPG oscillator state for observations <<<
+    self._last_omega_rl = np.array(omega, copy=True)
+    self._last_mu_rl = np.array(mus, copy=True)
+    self._last_cpg_xs = np.array(xs, copy=True)
+    self._last_cpg_zs = np.array(zs, copy=True)
+    # <<< END NEW >>>
+
     # IK parameters
     foot_y = self._robot_config.HIP_LINK_LENGTH
     sideSign = np.array([-1, 1, -1, 1]) # get correct hip sign (body right is negative)
@@ -789,6 +847,11 @@ class QuadrupedGymEnv(gym.Env):
     
     #MODIFIED
     self._prev_action = np.zeros(self._action_dim)
+    # reset CPG observation buffers
+    self._last_cpg_xs = np.zeros(4)
+    self._last_cpg_zs = np.zeros(4)
+    self._last_omega_rl = np.zeros(4)
+    self._last_mu_rl = np.zeros(4)
 
     if self._is_record_video:
       self.recordVideoHelper()
