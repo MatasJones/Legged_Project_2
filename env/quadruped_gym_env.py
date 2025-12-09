@@ -757,7 +757,7 @@ class QuadrupedGymEnv(gym.Env):
       dq_i = dq[i*3 : i*3+3]
       q_i = q[i*3 : i*3+3]
 
-      tau += kp * (q_des - q_i) + kd * (-dq_i)
+      tau = kp * (q_des - q_i) + kd * (-dq_i)
 
       v = J @ dq[3*i:3*i+3]
 
