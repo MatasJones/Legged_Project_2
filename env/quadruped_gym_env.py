@@ -427,8 +427,8 @@ class QuadrupedGymEnv(gym.Env):
             + drift_reward \
             - 1 * energy_reward \
             - orient_penalty \
-            + action_magnitude_penalty \
-            + action_rate_penalty
+            #+ action_magnitude_penalty \
+            #+ action_rate_penalty
 
     return max(reward,0) # keep rewards positive
 
