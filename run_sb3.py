@@ -96,7 +96,7 @@ if __name__ == '__main__':
     torch.set_num_threads(1)
 
     if LOAD_NN:
-        interm_dir = "./logs/intermediate_models/"
+        interm_dir = "/content/drive/MyDrive/QuadrupedRL_Logs/"
         log_dir = interm_dir + ''  
         stats_path = os.path.join(log_dir, "vec_normalize.pkl")
         model_name = get_latest_model(log_dir)
