@@ -62,7 +62,7 @@ TARGET_VELOCITY = 0.8
 if TRAINING_TASK == "VELOCITY":
     env_configs = {
         "motor_control_mode": "CPG",
-        "task_env": "FWD_LOCOMOTION",
+        "task_env": "FWD_LOCOMOTION_CPG",
         "observation_space_mode": "CPG",
         "terrain": None,
         "add_noise": False,
