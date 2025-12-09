@@ -46,7 +46,7 @@ from env.quadruped_gym_env import QuadrupedGymEnv
 
 # --- GLOBAL CONFIG ---
 LEARNING_ALG = "PPO" #Works
-LOAD_NN = True      
+LOAD_NN = False      
 USE_GPU = True       
 
 # -----------------------------------------------------------
