@@ -417,16 +417,18 @@ class QuadrupedGymEnv(gym.Env):
     orient_penalty = 1.0 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
 
     action_magnitude_penalty = -0.1 * np.sum(self._last_action**2)
+    print("action magnitude penalty", action_magnitude_penalty)
 
     action_rate_penalty = -0.05 * np.sum((self._last_action - self._prev_action)**2)
+    print("action magnitude penalty", action_rate_penalty)
 
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
-            - 0.15 * energy_reward \
+            - 0.1 * energy_reward \
             - orient_penalty \
-            #+ action_magnitude_penalty \
-            #+ action_rate_penalty
+            + action_magnitude_penalty \
+            + action_rate_penalty
 
     return max(reward,0) # keep rewards positive
 
