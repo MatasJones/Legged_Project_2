@@ -32,7 +32,7 @@ USE_GPU = True
 NUM_ENVS = 6
 
 TRAINING_TASK = "VELOCITY" 
-TARGET_VELOCITY = 0.1      
+TARGET_VELOCITY = 0.8      
 
 if TRAINING_TASK == "VELOCITY":
     env_configs = {
