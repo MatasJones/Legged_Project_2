@@ -482,6 +482,51 @@ class QuadrupedGymEnv(gym.Env):
             #+ action_rate_penalty
 
     return max(reward,0) # keep rewards positive
+  
+  def _reward_fwd_locomotion_cpg(self, des_vel_x=None):
+    """Learn forward locomotion at a desired velocity. """
+    v_x = self.robot.GetBaseLinearVelocity()[0]
+
+    if des_vel_x is None:
+      # Simple "go forward" reward, saturated
+      vel_tracking_reward = 0.1 * np.clip(v_x, 0.0, MAX_FWD_VELOCITY)
+    else:
+      # Velocity tracking around desired speed (Gaussian-shaped)
+      vel_err = v_x - des_vel_x
+      vel_tracking_reward = 1.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
+
+    # minimize yaw (go straight)
+    yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
+    yaw_reward = -1.0 * np.abs(yaw) 
+    
+    # don't drift laterally 
+    drift_reward = -0.5 * abs(self.robot.GetBasePosition()[1]) 
+    
+    # minimize energy 
+    energy_reward = 0 
+    for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
+      energy_reward += np.abs(np.dot(tau,vel)) * self._time_step
+
+    # penalize deviation from upright quaternion
+    orient_quat = self.robot.GetBaseOrientation()
+    orient_penalty = 1.0 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
+
+    action_magnitude_penalty = -1 * np.sum(self._last_action**2)
+    #print("action magnitude penalty", action_magnitude_penalty)
+
+    action_rate_penalty = -0.5 * np.sum((self._last_action - self._prev_action)**2)
+    #print("action magnitude penalty", action_rate_penalty)
+
+    reward = vel_tracking_reward \
+            + yaw_reward \
+            + drift_reward \
+            - 0.1 * energy_reward \
+            - orient_penalty \
+            #+ action_magnitude_penalty \
+            #+ action_rate_penalty
+
+    return max(reward,0) # keep rewards positive
+
 
 
   def get_distance_and_angle_to_goal(self):
@@ -575,6 +620,8 @@ class QuadrupedGymEnv(gym.Env):
     """ Get reward depending on task"""
     if self._TASK_ENV == "FWD_LOCOMOTION":
       return self._reward_fwd_locomotion(des_vel_x=self._des_vel_x)
+    if self._TASK_ENV == "FWD_LOCOMOTION_CPG":
+      return self._reward_fwd_locomotion_cpg(des_vel_x=self._des_vel_x)
     elif self._TASK_ENV == "LR_COURSE_TASK":
       return self._reward_lr_course()
     elif self._TASK_ENV == "FLAGRUN":
