@@ -520,7 +520,7 @@ class QuadrupedGymEnv(gym.Env):
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
-            - 0.1 * energy_reward \
+            - 0.01 * energy_reward \
             - orient_penalty \
             #+ action_magnitude_penalty \
             #+ action_rate_penalty
