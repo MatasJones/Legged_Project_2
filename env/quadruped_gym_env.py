@@ -398,14 +398,14 @@ class QuadrupedGymEnv(gym.Env):
     else:
       # Velocity tracking around desired speed (Gaussian-shaped)
       vel_err = v_x - des_vel_x
-      vel_tracking_reward = 1.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
+      vel_tracking_reward = 10.0 * np.exp(-(vel_err**2) / (2 * 2.5**2))
 
     # minimize yaw (go straight)
     yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
-    yaw_reward = -1.0 * np.abs(yaw) 
+    yaw_reward = -10 * np.abs(yaw) 
     
     # don't drift laterally 
-    drift_reward = -0.5 * abs(self.robot.GetBasePosition()[1]) 
+    drift_reward = -5 * abs(self.robot.GetBasePosition()[1]) 
     
     # minimize energy 
     energy_reward = 0 
@@ -414,18 +414,18 @@ class QuadrupedGymEnv(gym.Env):
 
     # penalize deviation from upright quaternion
     orient_quat = self.robot.GetBaseOrientation()
-    orient_penalty = 1.0 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
+    orient_penalty = 10 * np.linalg.norm(orient_quat - np.array([0,0,0,1]))
 
-    action_magnitude_penalty = -0.1 * np.sum(self._last_action**2)
-    print("action magnitude penalty", action_magnitude_penalty)
+    action_magnitude_penalty = -1 * np.sum(self._last_action**2)
+    #print("action magnitude penalty", action_magnitude_penalty)
 
-    action_rate_penalty = -0.05 * np.sum((self._last_action - self._prev_action)**2)
-    print("action magnitude penalty", action_rate_penalty)
+    action_rate_penalty = -0.5 * np.sum((self._last_action - self._prev_action)**2)
+    #print("action magnitude penalty", action_rate_penalty)
 
     reward = vel_tracking_reward \
             + yaw_reward \
             + drift_reward \
-            - 0.1 * energy_reward \
+            - 1 * energy_reward \
             - orient_penalty \
             + action_magnitude_penalty \
             + action_rate_penalty
