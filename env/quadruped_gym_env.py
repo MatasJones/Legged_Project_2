@@ -769,7 +769,7 @@ class QuadrupedGymEnv(gym.Env):
       v = J @ dq[3*i:3*i+3]
 
       # add Cartesian PD contribution (as you wish)
-      tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
+      #tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
       
       action[3*i:3*i+3] = tau
 
