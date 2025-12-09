@@ -46,7 +46,7 @@ from env.quadruped_gym_env import QuadrupedGymEnv
 
 # --- GLOBAL CONFIG ---
 LEARNING_ALG = "PPO" #Works
-LOAD_NN = False      
+LOAD_NN = True      
 USE_GPU = True       
 
 # -----------------------------------------------------------
@@ -186,7 +186,7 @@ if __name__ == '__main__':
             model = SAC.load(model_name, env)
         print("\nLoaded model", model_name, "\n")
 
-    model.learn(total_timesteps=1000000, log_interval=1, callback=checkpoint_callback)
+    model.learn(total_timesteps=2000000, log_interval=1, callback=checkpoint_callback)
 
     model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
     env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
