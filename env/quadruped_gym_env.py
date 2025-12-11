@@ -224,7 +224,18 @@ class QuadrupedGymEnv(gym.Env):
     self.reset()
  
   def setupCPG(self):
-    self._cpg = HopfNetwork(use_RL=True)
+    self._cpg = HopfNetwork(
+        use_RL=True,
+        alpha=80,
+        coupling_strength=10,      # maybe start milder than 10
+        gait="TROT",              # or "PACE" if you really want that
+        ground_clearance=0.17,
+        ground_penetration=0.085,
+        robot_height=0.25,
+        des_step_len=0.07,
+        max_step_len_rl=0.15      # small bump vs default 0.10 for more speed
+    )
+
 
   ######################################################################################
   # RL Observation and Action spaces 
