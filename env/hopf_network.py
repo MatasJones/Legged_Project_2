@@ -247,24 +247,38 @@ class HopfNetwork():
     self._mu_rl = mus
 
   def _integrate_hopf_equations_rl(self):
-    """ Hopf polar equations and integration, using quantities set by RL """
-    # bookkeeping - save copies of current CPG states 
+    """Hopf polar equations and integration, using μ and ω set by RL."""
     X = self.X.copy()
-    X_dot_prev = self.X_dot.copy() 
-    X_dot = np.zeros((2,4))
+    X_dot_prev = self.X_dot.copy()
+    X_dot = np.zeros((2, 4))
 
-    # loop through each leg's oscillator, find current velocities
     for i in range(4):
-      # get r_i, theta_i from X
-      r, theta = X[:,i]
-      # amplitude (use mu from RL, i.e. self._mu_rl[i])
-      r_dot = 0  # [TODO]
-      # phase (use omega from RL, i.e. self._omega_rl[i])
-      theta_dot = 0 # [TODO]
+      r, theta = X[:, i]
 
-      X_dot[:,i] = [r_dot, theta_dot]
+      # Amplitude dynamics: ṙ = α (μ - r²) r   with μ from RL
+      mu_i = self._mu_rl[i]
+      r_dot = self._alpha * (mu_i - r**2) * r
 
-    # integrate 
-    self.X = X + (X_dot_prev + X_dot) * self._dt / 2
+      # Base phase dynamics: θ̇ = ω_i + coupling
+      omega_i = self._omega_rl[i]
+      theta_dot = omega_i
+
+      if self._couple:
+        coupling_term = 0.0
+        for j in range(4):
+          if j == i:
+            continue
+          r_j, theta_j = X[:, j]
+          coupling_term += (
+              self._coupling_strength
+              * r_j
+              * np.sin(theta_j - theta - self.PHI[i, j])
+          )
+        theta_dot += coupling_term
+
+      X_dot[:, i] = [r_dot, theta_dot]
+
+    # semi-implicit / trapezoidal integration
+    self.X = X + (X_dot_prev + X_dot) * self._dt / 2.0
     self.X_dot = X_dot
-    self.X[1,:] = self.X[1,:] % (2*np.pi)
+    self.X[1, :] = self.X[1, :] % (2.0 * np.pi)
