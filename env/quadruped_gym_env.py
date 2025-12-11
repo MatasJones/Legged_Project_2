@@ -770,7 +770,7 @@ class QuadrupedGymEnv(gym.Env):
       v = J @ dq[i*3 : i*3+3]
       
       # calculate torques with Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau = kpCartesian @ (pd - p) + kdCartesian @ (vd - v)
+      #tau = kpCartesian @ (pd - p) + kdCartesian @ (vd - v)
 
       action[3*i:3*i+3] = tau
 
