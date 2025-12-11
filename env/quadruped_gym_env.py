@@ -565,14 +565,14 @@ class QuadrupedGymEnv(gym.Env):
     else:
       # Velocity tracking around desired speed (Gaussian-shaped)
       vel_err = v_x - des_vel_x
-      vel_tracking_reward = 1.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
+      vel_tracking_reward = 2.0 * np.exp(-(vel_err**2) / (2 * 0.25**2))
 
     # minimize yaw (go straight)
     yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
     yaw_reward = -1.0 * np.abs(yaw) 
 
     pitch = self.robot.GetBaseOrientationRollPitchYaw()[1]
-    pitch_reward = -1.5 * np.abs(pitch) 
+    pitch_reward = -1.0 * np.abs(pitch) 
     
     # don't drift laterally 
     drift_reward = -0.5 * abs(self.robot.GetBasePosition()[1]) 
@@ -786,8 +786,8 @@ class QuadrupedGymEnv(gym.Env):
     omega_base = 4.0 * 2 * np.pi   # ~4 Hz, shared
 
     # === RL deltas (per leg, but small) ===
-    d_omega = (1.0 * 2 * np.pi) * u[0:4]   # ±0.5 Hz around base
-    d_mu    = 1.0 * u[4:8]                 # small change around mu_base
+    d_omega = (2.0 * 2 * np.pi) * u[0:4]   # ±0.5 Hz around base
+    d_mu    = 2.0 * u[4:8]                 # small change around mu_base
 
     omega = omega_base + d_omega
     mus   = mu_base   + d_mu
