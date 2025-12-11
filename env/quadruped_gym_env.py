@@ -572,7 +572,7 @@ class QuadrupedGymEnv(gym.Env):
     yaw_reward = -1.0 * np.abs(yaw) 
 
     pitch = self.robot.GetBaseOrientationRollPitchYaw()[1]
-    pitch_reward = -1.0 * np.abs(pitch) 
+    pitch_reward = -1.5 * np.abs(pitch) 
     
     # don't drift laterally 
     drift_reward = -0.5 * abs(self.robot.GetBasePosition()[1]) 
@@ -786,8 +786,8 @@ class QuadrupedGymEnv(gym.Env):
     omega_base = 4.0 * 2 * np.pi   # ~4 Hz, shared
 
     # === RL deltas (per leg, but small) ===
-    d_omega = (0.5 * 2 * np.pi) * u[0:4]   # ±0.5 Hz around base
-    d_mu    = 0.5 * u[4:8]                 # small change around mu_base
+    d_omega = (1.0 * 2 * np.pi) * u[0:4]   # ±0.5 Hz around base
+    d_mu    = 1.0 * u[4:8]                 # small change around mu_base
 
     omega = omega_base + d_omega
     mus   = mu_base   + d_mu
@@ -853,7 +853,7 @@ class QuadrupedGymEnv(gym.Env):
       v = J @ dq[3*i:3*i+3]
 
       # add Cartesian PD contribution (as you wish)
-      #tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
+      tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
       
       action[3*i:3*i+3] = tau
 
