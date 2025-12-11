@@ -793,7 +793,7 @@ class QuadrupedGymEnv(gym.Env):
     mus   = mu_base   + d_mu
 
     # clip to safe ranges
-    omega = np.clip(omega, 2.0 * 2 * np.pi, 6.0 * 2 * np.pi)
+    omega = np.clip(omega, 5.0, 4.5 * 2 * np.pi)
     mus   = np.clip(mus, 1.3**2, 2.1**2)
 
     self._cpg.set_omega_rl(omega)

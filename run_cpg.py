@@ -46,7 +46,7 @@ from env.hopf_network import HopfNetwork
 from env.quadruped_gym_env import QuadrupedGymEnv
 
 ADD_CARTESIAN_PD = True
-TIME_STEP = 0.0001
+TIME_STEP = 0.001
 foot_y = 0.0838 # this is the hip length 
 sideSign = np.array([-1, 1, -1, 1]) # get correct hip sign (body right is negative)
 
@@ -64,7 +64,7 @@ env = QuadrupedGymEnv(render=True,              # visualize
 mu = 1.7 ** 2
 omega_swing = 10 * 2 * np.pi
 omega_stance = 18 * 2 * np.pi
-gait = "TROT"
+gait = "PACE"
 alpha = 80
 coupling_strength = 10
 ground_clearance = 0.17   # foot swing height 
