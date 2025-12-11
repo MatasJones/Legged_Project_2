@@ -211,8 +211,11 @@ class HopfNetwork():
 
     # integrate 
     # TODO MATAS done
-    self.X += X_dot_prev*self._dt
+    #self.X += X_dot_prev*self._dt
+    #self.X_dot = X_dot
+    self.X = X + (X_dot_prev + X_dot) * self._dt / 2.0
     self.X_dot = X_dot
+
     # mod phase variables to keep between 0 and 2pi
     self.X[1,:] = self.X[1,:] % (2*np.pi)
 
@@ -262,19 +265,6 @@ class HopfNetwork():
       # Base phase dynamics: θ̇ = ω_i + coupling
       omega_i = self._omega_rl[i]
       theta_dot = omega_i
-
-      if self._couple:
-        coupling_term = 0.0
-        for j in range(4):
-          if j == i:
-            continue
-          r_j, theta_j = X[:, j]
-          coupling_term += (
-              self._coupling_strength
-              * r_j
-              * np.sin(theta_j - theta - self.PHI[i, j])
-          )
-        theta_dot += coupling_term
 
       X_dot[:, i] = [r_dot, theta_dot]
 
