@@ -299,14 +299,43 @@ class QuadrupedGymEnv(gym.Env):
                              foot_contact_low,
                              prev_action_low
                            )) - OBSERVATION_EPS)
+    
     elif self._observation_space_mode == "CPG":
       """
-      CPG_ONLY (16 dims):
-        0-3   : CPG x (per leg)
-        4-7   : CPG z (per leg)
-        8-11  : omega_rl (per leg)
-        12-15 : mu_rl (per leg)
+      LR_COURSE_OBS (50 dims):
+        0-11   : joint positions q
+        12-23  : joint velocities dq
+        24     : base height z
+        25-27  : base roll, pitch, yaw
+        28-30  : base linear velocity (x,y,z)
+        31-33  : base angular velocity (wx, wy, wz)
+        34-37  : foot contact booleans (FR, FL, RR, RL)
+        38-49  : previous action (12D, in [-1,1])
+        50-57  : CPG x (per leg)
       """
+      joint_pos_high = self._robot_config.UPPER_ANGLE_JOINT
+      joint_pos_low  = self._robot_config.LOWER_ANGLE_JOINT
+
+      joint_vel_high = self._robot_config.VELOCITY_LIMITS
+      joint_vel_low  = -self._robot_config.VELOCITY_LIMITS
+
+      base_height_high = np.array([1.0])
+      base_height_low  = np.array([0.0])
+
+      rpy_high = np.array([np.pi, np.pi, np.pi])
+      rpy_low  = -rpy_high
+
+      base_lin_vel_high = np.array([3.0, 3.0, 3.0])
+      base_lin_vel_low  = -base_lin_vel_high
+
+      base_ang_vel_high = np.array([10.0, 10.0, 10.0])
+      base_ang_vel_low  = -base_ang_vel_high
+
+      foot_contact_high = np.ones(4)
+      foot_contact_low  = np.zeros(4)
+
+      prev_action_high  = np.ones(self._action_dim)
+      prev_action_low   = -np.ones(self._action_dim)
 
       # bounds for CPG state x,z — tune as needed
       cpg_xz_high = np.array([0.3] * 8)
@@ -321,12 +350,28 @@ class QuadrupedGymEnv(gym.Env):
       mu_low  = np.array([MU_LOW**2] * 4)
 
       observation_high = (np.concatenate((
+                              joint_pos_high,
+                              joint_vel_high,
+                              base_height_high,
+                              rpy_high,
+                              base_lin_vel_high,
+                              base_ang_vel_high,
+                              foot_contact_high,
+                              prev_action_high,
                               cpg_xz_high,   # x,z (8)
                               omega_high,    # 4
-                              mu_high        # 4
+                              mu_high
                             )) + OBSERVATION_EPS)
 
       observation_low = (np.concatenate((
+                             joint_pos_low,
+                             joint_vel_low,
+                             base_height_low,
+                             rpy_low,
+                             base_lin_vel_low,
+                             base_ang_vel_low,
+                             foot_contact_low,
+                             prev_action_low,
                              cpg_xz_low,
                              omega_low,
                              mu_low
@@ -391,7 +436,34 @@ class QuadrupedGymEnv(gym.Env):
       omega = self._last_omega_rl
       mus   = self._last_mu_rl
 
+      # Joint states
+      q = self.robot.GetMotorAngles()
+      dq = self.robot.GetMotorVelocities()
+
+      # Base states
+      base_pos = self.robot.GetBasePosition()
+      base_rpy = self.robot.GetBaseOrientationRollPitchYaw()
+      base_lin_vel = self.robot.GetBaseLinearVelocity()
+      base_ang_vel = self.robot.GetBaseAngularVelocity()
+
+      # Foot contacts (boolean per foot)
+      _, _, _, feetInContactBool = self.robot.GetContactInfo()
+
+      # Previous action (in [-1,1] before scaling to motors)
+      if hasattr(self, "_last_action"):
+        last_action = self._last_action
+      else:
+        last_action = np.zeros(self._action_dim)
+
       self._observation = np.concatenate((
+                              q,
+                              dq,
+                              np.array([base_pos[2]]),
+                              base_rpy,
+                              base_lin_vel,
+                              base_ang_vel,
+                              np.array(feetInContactBool),
+                              last_action,
                               cpg_x,
                               cpg_z,
                               omega,
@@ -710,7 +782,7 @@ class QuadrupedGymEnv(gym.Env):
     u = np.clip(actions,-1,1)
 
     # scale omega to ranges, and set in CPG (range is an example)
-    omega = self._scale_helper( u[0:4], 5, 4.5*2*np.pi)
+    omega = self._scale_helper( u[0:4], 2.0 * 2*np.pi, 3.5 * 2*np.pi)
     self._cpg.set_omega_rl(omega)
 
     # scale mu to ranges, and set in CPG (squared since we converge to the sqrt in the CPG amplitude)
@@ -913,6 +985,7 @@ class QuadrupedGymEnv(gym.Env):
     self._last_cpg_zs = np.zeros(4)
     self._last_omega_rl = np.zeros(4)
     self._last_mu_rl = np.zeros(4)
+    self._cpg = HopfNetwork(use_RL=True)
 
     if self._is_record_video:
       self.recordVideoHelper()
