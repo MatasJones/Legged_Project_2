@@ -781,23 +781,31 @@ class QuadrupedGymEnv(gym.Env):
     # clip RL actions to be between -1 and 1 (standard RL technique)
     u = np.clip(actions,-1,1)
 
-    # scale omega to ranges, and set in CPG (range is an example)
-    omega = self._scale_helper( u[0:4], 2.0 * 2*np.pi, 3.5 * 2*np.pi)
-    self._cpg.set_omega_rl(omega)
+    # === baseline gait ===
+    mu_base    = 1.7 ** 2
+    omega_base = 4.0 * 2 * np.pi   # ~4 Hz, shared
 
-    # scale mu to ranges, and set in CPG (squared since we converge to the sqrt in the CPG amplitude)
-    mus = self._scale_helper( u[4:8], MU_LOW**2, MU_UPP**2)
+    # === RL deltas (per leg, but small) ===
+    d_omega = (0.5 * 2 * np.pi) * u[0:4]   # ±0.5 Hz around base
+    d_mu    = 0.5 * u[4:8]                 # small change around mu_base
+
+    omega = omega_base + d_omega
+    mus   = mu_base   + d_mu
+
+    # clip to safe ranges
+    omega = np.clip(omega, 2.0 * 2 * np.pi, 6.0 * 2 * np.pi)
+    mus   = np.clip(mus, 1.3**2, 2.1**2)
+
+    self._cpg.set_omega_rl(omega)
     self._cpg.set_mu_rl(mus)
 
-    # integrate CPG, get mapping to foot positions
-    xs,zs = self._cpg.update()
+    xs, zs = self._cpg.update()
 
-    # >>> NEW: store CPG oscillator state for observations <<<
+    # store for observations
     self._last_omega_rl = np.array(omega, copy=True)
-    self._last_mu_rl = np.array(mus, copy=True)
-    self._last_cpg_xs = np.array(xs, copy=True)
-    self._last_cpg_zs = np.array(zs, copy=True)
-    # <<< END NEW >>>
+    self._last_mu_rl    = np.array(mus, copy=True)
+    self._last_cpg_xs   = np.array(xs, copy=True)
+    self._last_cpg_zs   = np.array(zs, copy=True)
 
     # IK parameters
     foot_y = self._robot_config.HIP_LINK_LENGTH
