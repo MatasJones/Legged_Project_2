@@ -27,169 +27,131 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2022 EPFL, Guillaume Bellegarda
+
 """
 Run stable baselines 3 on quadruped env 
+Check the documentation! https://stable-baselines3.readthedocs.io/en/master/
 """
 
+# misc
 import os
-import multiprocessing 
 from datetime import datetime
-import torch # Needed for thread optimization
 
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+# stable baselines 3
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.env_util import make_vec_env
 
+# utils
 from utils.utils import CheckpointCallback
-from utils.file_utils import get_latest_model, write_env_config
+from utils.file_utils import get_latest_model
+
+# gym environment
 from env.quadruped_gym_env import QuadrupedGymEnv
 
-# --- GLOBAL CONFIG ---
-LEARNING_ALG = "PPO" #Works
-LOAD_NN = False      
-USE_GPU = True       
+LEARNING_ALG = "PPO" # or "SAC"
+LOAD_NN = False # if you want to initialize training with a previous model 
+NUM_ENVS = 6    # how many pybullet environments to create for data collection
+USE_GPU = True # make sure to install all necessary drivers 
 
-# -----------------------------------------------------------
-# OPTIMIZATION: CPU CORES
-# Colab 12 threads = ~6 Physical Cores.
-# We set this to 6 to give PyBullet dedicated physical cores.
-# -----------------------------------------------------------
-NUM_ENVS = 6
+# after implementing, you will want to test how well the agent learns with your MDP: 
+# env_configs = {"motor_control_mode":"CPG",
+#                "task_env": "FWD_LOCOMOTION", #  "LR_COURSE_TASK",
+#                "observation_space_mode": "LR_COURSE_OBS"}
+env_configs = {}
 
-TRAINING_TASK = "VELOCITY" 
-TARGET_VELOCITY = 0.8      
-
-if TRAINING_TASK == "VELOCITY":
-    env_configs = {
-        "motor_control_mode": "CPG",
-        "task_env": "FWD_LOCOMOTION_CPG",
-        "observation_space_mode": "CPG_MIN",
-        "terrain": None,
-        "add_noise": False,
-        "des_vel_x": TARGET_VELOCITY,
-    }
-elif TRAINING_TASK == "SLOPES":
-    env_configs = {
-        "motor_control_mode": "PD",
-        "task_env": "LR_COURSE_TASK",
-        "observation_space_mode": "LR_COURSE_OBS",
-        "terrain": "SLOPES",
-        "add_noise": True,
-        "des_vel_x": TARGET_VELOCITY,
-    }
-else:
-    raise ValueError(TRAINING_TASK + " not implemented")
-
-# -----------------------------------------------------------
-# CRITICAL FIX: ENABLE GPU FOR PPO
-# -----------------------------------------------------------
-if USE_GPU:
-    gpu_arg = "auto"  # This will detect CUDA for both PPO and SAC
+if USE_GPU: #and LEARNING_ALG=="SAC":
+    gpu_arg = "auto" 
 else:
     gpu_arg = "cpu"
 
-print(f"--- Training {LEARNING_ALG} on device: {gpu_arg} ---")
+if LOAD_NN:
+    interm_dir = "./logs/intermediate_models/"
+    log_dir = interm_dir + '' # add path
+    stats_path = os.path.join(log_dir, "vec_normalize.pkl")
+    model_name = get_latest_model(log_dir)
 
+# directory to save policies and normalization parameters
+SAVE_PATH = './logs/intermediate_models/'+ datetime.now().strftime("%m%d%y%H%M%S") + '/'
+os.makedirs(SAVE_PATH, exist_ok=True)
 
-if __name__ == '__main__':
-    # OPTIMIZATION: Restrict PyTorch CPU usage so PyBullet can breathe
-    torch.set_num_threads(1)
+# checkpoint to save policy network periodically
+checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,name_prefix='rl_model', verbose=2)
 
-    if LOAD_NN:
-        interm_dir = "/content/drive/MyDrive/QuadrupedRL_Logs/"
-        log_dir = interm_dir + ''  
-        stats_path = os.path.join(log_dir, "vec_normalize.pkl")
-        model_name = get_latest_model(log_dir)
-
-    ROOT_SAVE_PATH = '/content/drive/MyDrive/QuadrupedRL_Logs/' #For Colab
-    SAVE_PATH = ROOT_SAVE_PATH + '{}_{}'.format(
-        TRAINING_TASK.lower(), datetime.now().strftime("%m%d%y%H%M%S")
-    ) + '/'
-    os.makedirs(SAVE_PATH, exist_ok=True)
-
-    checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,
-                                             name_prefix='rl_model', verbose=2)
-
-    make_env_fn = lambda: QuadrupedGymEnv(**env_configs)
+# create Vectorized gym environment
+env = lambda: QuadrupedGymEnv(**env_configs)  
     
-    # Use SubprocVecEnv for parallel execution
-    vec_env_cls = SubprocVecEnv 
+# Use SubprocVecEnv for parallel execution
+vec_env_cls = SubprocVecEnv 
+env = make_vec_env(env, monitor_dir=SAVE_PATH,n_envs=NUM_ENVS)
 
-    if LOAD_NN:
-        env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS, vec_env_cls=vec_env_cls)
-        env = VecNormalize.load(stats_path, env)
-        env.training = True
-        env.norm_reward = False
-    else:
-        env = make_vec_env(make_env_fn, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS, vec_env_cls=vec_env_cls)
-        env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
+# normalize observations to stabilize learning (why?)
+env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
-    write_env_config(SAVE_PATH, env, updated_config=env_configs)
+if LOAD_NN:
+    env = lambda: QuadrupedGymEnv(**env_configs)
+    env = make_vec_env(env, monitor_dir=SAVE_PATH, n_envs=NUM_ENVS)
+    env = VecNormalize.load(stats_path, env)
 
-    # -----------------------------------------------------------
-    # OPTIMIZATION: HYPERPARAMETERS
-    # Large batches to saturate the GPU
-    # -----------------------------------------------------------
-    policy_kwargs = dict(net_arch=[256,256]) 
+# Multi-layer perceptron (MLP) policy of two layers of size _,_ each with tanh activation function
+policy_kwargs = dict(net_arch=[256,256]) # act_fun=tf.nn.tanh
 
-    # With 6 envs, 2048 steps each = 12,288 steps per update.
-    # This keeps the GPU busy and reduces CPU interruption.
-    n_steps_per_env = 2048 
-    
-    ppo_config = {  
-        "gamma": 0.995, 
-        "n_steps": n_steps_per_env, 
-        "ent_coef": 0.0, 
-        "learning_rate": 1e-4, 
-        "vf_coef": 0.5,
-        "max_grad_norm": 0.5, 
-        "gae_lambda": 0.95, 
-        "batch_size": 512,  # Large batch for GPU
-        "n_epochs": 15, 
-        "clip_range": 0.2, 
-        "clip_range_vf": 1,
-        "verbose": 1, 
-        "tensorboard_log": None, 
-        "_init_setup_model": True, 
-        "policy_kwargs": policy_kwargs,
-        "device": gpu_arg # Now correctly passes "auto" (GPU)
-    }
+# What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
+n_steps = 4096 
+learning_rate = lambda f: 1e-4 
+ppo_config = {  "gamma":0.995, 
+                "n_steps": int(n_steps/NUM_ENVS), 
+                "ent_coef":0.0, 
+                "learning_rate":learning_rate, 
+                "vf_coef":0.5,
+                "max_grad_norm":0.5, 
+                "gae_lambda":0.95, 
+                "batch_size":512,
+                "n_epochs":15, 
+                "clip_range":0.2, 
+                "clip_range_vf":1,
+                "verbose":1, 
+                "tensorboard_log":None, 
+                "_init_setup_model":True, 
+                "policy_kwargs":policy_kwargs,
+                "device": gpu_arg}
 
-    sac_config={
-        "learning_rate":1e-4,
-        "buffer_size":1000000,
-        "batch_size":4096,
-        "ent_coef":'auto', 
-        "gamma":0.99, 
-        "tau":0.005,
-        "train_freq":100, 
-        "gradient_steps":100,
-        "learning_starts": 2000,
-        "verbose":1, 
-        "tensorboard_log":None,
-        "policy_kwargs": policy_kwargs,
-        "seed":None, 
-        "device": gpu_arg
-    }
+# What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/sac.html
+sac_config={"learning_rate":1e-4,
+            "buffer_size":300000,
+            "batch_size":256,
+            "ent_coef":'auto', 
+            "gamma":0.99, 
+            "tau":0.005,
+            "train_freq":1, 
+            "gradient_steps":1,
+            "learning_starts": 10000,
+            "verbose":1, 
+            "tensorboard_log":None,
+            "policy_kwargs": policy_kwargs,
+            "seed":None, 
+            "device": gpu_arg}
 
+if LEARNING_ALG == "PPO":
+    model = PPO('MlpPolicy', env, **ppo_config)
+elif LEARNING_ALG == "SAC":
+    model = SAC('MlpPolicy', env, **sac_config)
+else:
+    raise ValueError(LEARNING_ALG + 'not implemented')
+
+if LOAD_NN:
     if LEARNING_ALG == "PPO":
-        model = PPO('MlpPolicy', env, **ppo_config)
+        model = PPO.load(model_name, env)
     elif LEARNING_ALG == "SAC":
-        model = SAC('MlpPolicy', env, **sac_config)
-    else:
-        raise ValueError(LEARNING_ALG + ' not implemented')
+        model = SAC.load(model_name, env)
+    print("\nLoaded model", model_name, "\n")
 
-    if LOAD_NN:
-        if LEARNING_ALG == "PPO":
-            model = PPO.load(model_name, env)
-        elif LEARNING_ALG == "SAC":
-            model = SAC.load(model_name, env)
-        print("\nLoaded model", model_name, "\n")
+# Learn and save (may need to train for longer)
+model.learn(total_timesteps=1000000, log_interval=1,callback=checkpoint_callback)
 
-    model.learn(total_timesteps=1000000, log_interval=1, callback=checkpoint_callback)
+# Don't forget to save the VecNormalize statistics when saving the agent
+model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
+env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
 
-    model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
-    env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
-
-    if LEARNING_ALG == "SAC": 
-        model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
+if LEARNING_ALG == "SAC": # save replay buffer 
+    model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
