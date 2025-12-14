@@ -266,6 +266,14 @@ class HopfNetwork():
       omega_i = self._omega_rl[i]
       theta_dot = omega_i
 
+      # Apply coupling (same as in _integrate_hopf_equations)
+      if self._couple:
+        coupling = 0.0
+        for j in range(4):
+          if j == i: continue
+          coupling += X[0,j]*self._coupling_strength*np.sin(X[1,j] - X[1,i] - self.PHI[i, j])
+        theta_dot += coupling
+
       X_dot[:, i] = [r_dot, theta_dot]
 
     # semi-implicit / trapezoidal integration
