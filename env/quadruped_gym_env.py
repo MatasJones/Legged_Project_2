@@ -883,7 +883,7 @@ class QuadrupedGymEnv(gym.Env):
 
       p_des = np.array([x,y,z])
 
-      J, leg_pose = self.robot.ComputeJacobianAndPosition(i)
+      #J, leg_pose = self.robot.ComputeJacobianAndPosition(i)
 
       # call inverse kinematics to get corresponding joint angles
       q_des = self.robot.ComputeInverseKinematics(i, p_des)
@@ -901,7 +901,7 @@ class QuadrupedGymEnv(gym.Env):
 
       tau = kp_i * (q_des - q_i) + kd_i * (-dq_i)
 
-      v = J @ dq[3*i:3*i+3]
+      #v = J @ dq[3*i:3*i+3]
 
       # add Cartesian PD contribution (as you wish)
       #tau += kpCartesian @ (p_des - leg_pose) + kdCartesian @ (-v)
