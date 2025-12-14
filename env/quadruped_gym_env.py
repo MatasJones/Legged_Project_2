@@ -201,8 +201,7 @@ class QuadrupedGymEnv(gym.Env):
     self._action_bound = 1.0
 
     #MODIFIED
-    self._prev_action = np.zeros(self._action_dim if hasattr(self, '_action_dim') else 12)
-
+  
     # CPG-related state for observations (high-level only)
     self._last_cpg_xs = np.zeros(4)
     self._last_cpg_zs = np.zeros(4)
@@ -388,6 +387,33 @@ class QuadrupedGymEnv(gym.Env):
                              mu_low
                            )) - OBSERVATION_EPS)
 
+    elif self._observation_space_mode == "CPG_MIN":
+      """
+      obs_min (20 dims):
+        0-3   : CPG amplitudes r (FR, FL, RR, RL)
+        4-7   : CPG phases theta
+        8-11  : CPG r_dot
+        12-15 : CPG theta_dot
+        16-19 : foot contacts (0/1)
+      """
+
+      # Bounds: choose finite bounds so noise scaling doesn't explode.
+      # r is roughly in [1,2] (your MU_LOW/MU_UPP), allow some margin:
+      r_high = np.array([2.5]*4); r_low = np.array([0.0]*4)
+
+      # theta in [0, 2*pi]
+      th_high = np.array([2*np.pi]*4); th_low = np.array([0.0]*4)
+
+      # derivatives: pick safe-ish bounds (tune if needed)
+      dr_high = np.array([10.0]*4); dr_low = -dr_high
+      dth_high = np.array([50.0]*4); dth_low = np.array([0.0]*4)  # theta_dot >= 0 usually
+
+      # contacts in [0,1]
+      c_high = np.ones(4); c_low = np.zeros(4)
+
+      observation_high = np.concatenate((r_high, th_high, dr_high, dth_high, c_high)) + OBSERVATION_EPS
+      observation_low  = np.concatenate((r_low,  th_low,  dr_low,  dth_low,  c_low )) - OBSERVATION_EPS
+
     else:
       raise ValueError("observation space not defined or not intended")
 
@@ -480,6 +506,20 @@ class QuadrupedGymEnv(gym.Env):
                               omega,
                               mus
                             ))
+    elif self._observation_space_mode == "CPG_MIN":
+      r      = self._cpg.get_r()
+      theta  = self._cpg.get_theta()
+      dr     = self._cpg.get_dr()
+      dtheta = self._cpg.get_dtheta()
+
+      # Foot contacts
+      _, _, _, feetInContactBool = self.robot.GetContactInfo()
+      contacts = np.array(feetInContactBool, dtype=np.float32)  # shape (4,)
+
+      self._observation = np.concatenate((
+          r, theta, dr, dtheta, contacts
+      )).astype(np.float32)
+
     else:
       raise ValueError("observation space not defined or not intended")
 
@@ -1004,7 +1044,7 @@ class QuadrupedGymEnv(gym.Env):
     self._last_cpg_zs = np.zeros(4)
     self._last_omega_rl = np.zeros(4)
     self._last_mu_rl = np.zeros(4)
-    self._cpg = HopfNetwork(use_RL=True)
+    self.setupCPG()
 
     if self._is_record_video:
       self.recordVideoHelper()
