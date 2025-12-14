@@ -100,7 +100,7 @@ policy_kwargs = dict(net_arch=[256,256]) # act_fun=tf.nn.tanh
 n_steps = 4096 
 learning_rate = lambda f: 1e-4 
 ppo_config = {  "gamma":0.995, 
-                "n_steps": int(n_steps/NUM_ENVS), 
+                "n_steps": n_steps, 
                 "ent_coef":0.0, 
                 "learning_rate":learning_rate, 
                 "vf_coef":0.5,
