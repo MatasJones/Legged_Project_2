@@ -71,8 +71,12 @@ if LOAD_NN:
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
+TRAINING_TASK = "VELOCITY" # "LR_COURSE_TASK"
 # directory to save policies and normalization parameters
-SAVE_PATH = './logs/intermediate_models/'+ datetime.now().strftime("%m%d%y%H%M%S") + '/'
+ROOT_SAVE_PATH = '/content/drive/MyDrive/QuadrupedRL_Logs/' #For Colab
+SAVE_PATH = ROOT_SAVE_PATH + '{}_{}'.format(
+    TRAINING_TASK.lower(), datetime.now().strftime("%m%d%y%H%M%S")
+) + '/'
 os.makedirs(SAVE_PATH, exist_ok=True)
 
 # checkpoint to save policy network periodically
@@ -97,7 +101,7 @@ if LOAD_NN:
 policy_kwargs = dict(net_arch=[256,256]) # act_fun=tf.nn.tanh
 
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
-n_steps = 4096 
+n_steps = 2048 
 learning_rate = lambda f: 1e-4 
 ppo_config = {  "gamma":0.995, 
                 "n_steps": n_steps, 
