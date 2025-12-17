@@ -1,3 +1,5 @@
+# run_cpg.py
+
 # SPDX-FileCopyrightText: Copyright (c) 2022 Guillaume Bellegarda. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 # 
@@ -64,7 +66,7 @@ env = QuadrupedGymEnv(render=True,              # visualize
 mu = 1.7 ** 2
 omega_swing = 10 * 2 * np.pi
 omega_stance = 18 * 2 * np.pi
-gait = "TROT"
+gait = "WALK"
 alpha = 80
 coupling_strength = 10
 ground_clearance = 0.17   # foot swing height 
@@ -136,7 +138,7 @@ for j in range(TEST_STEPS):
 
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
        # [TODO] MATAS done
-      tau += kpCartesian @ (leg_pd - leg_p) + kdCartesian @ (-leg_dp)
+      tau += J.T @ (kpCartesian @ (leg_pd - leg_p) + kdCartesian @ (-leg_dp))
 
     # Set tau for legi in action vector
     action[3*current_leg:3*current_leg+3] = tau

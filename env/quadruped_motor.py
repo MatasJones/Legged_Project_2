@@ -1,3 +1,5 @@
+# env/quadruped_motor.py
+
 # SPDX-FileCopyrightText: Copyright (c) 2022 Guillaume Bellegarda. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 # 
@@ -93,7 +95,7 @@ class QuadrupedMotorModel(object):
 
     # No processing for motor torques
     # Edit: SHOULD still clip torque values
-    if motor_control_mode is "TORQUE":
+    if motor_control_mode == "TORQUE":
       assert len(motor_commands) == NUM_MOTORS
       motor_torques = self._strength_ratios * motor_commands
       motor_torques = np.clip(motor_torques, -1.0 * self._torque_limits,
@@ -106,7 +108,7 @@ class QuadrupedMotorModel(object):
     kp = None
     kd = None
     additional_torques = np.full(NUM_MOTORS, 0)
-    if motor_control_mode is "PD":
+    if motor_control_mode == "PD":
       assert len(motor_commands) == NUM_MOTORS
       kp = self._kp
       kd = self._kd
