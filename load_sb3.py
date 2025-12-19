@@ -1,4 +1,32 @@
-# load_sb3.py
+# SPDX-FileCopyrightText: Copyright (c) 2022 Guillaume Bellegarda. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Copyright (c) 2022 EPFL, Guillaume Bellegarda
 
 import os
 import glob
@@ -29,10 +57,10 @@ LEARNING_ALG = "PPO"  # "PPO" or "SAC"
 #   "TASK_SLOPES" -> slopes task-specific policy           
 #   "TASK_STAIRS" -> stairs task-specific policy           
 # --------------------------------------------------------------------------
-EVAL_POLICY = "TASK_SLOPES"
+EVAL_POLICY = "TASK_STAIRS"
 
 interm_dir = "./logs/intermediate_models/"
-log_dir = os.path.join(interm_dir, "TASK_SLOPES")  # set your run folder here
+log_dir = os.path.join(interm_dir, "TASK_STAIRS")  # set your run folder here
 print(f"Using log_dir: {log_dir}")
 
 # --- Multi-try evaluation (in case the robot falls at the beginning of the simulation) ---
@@ -58,7 +86,7 @@ env_config = {
     "task_env": "FWD_LOCOMOTION",
     "test_flagrun": False,
     "cpg_gait": "TROT",
-    "slope_pitch": 0.3,
+    "slope_pitch": 0.2,
 }
 
 if EVAL_POLICY == "VEL_TROT":
@@ -92,10 +120,15 @@ stats_path = os.path.join(log_dir, "vec_normalize.pkl")
 model_path = get_latest_model(log_dir)
 print("Latest model file:", model_path)
 
-TITLE_FS = 22
-LABEL_FS = 20
-TICK_FS  = 18
+TITLE_FS = 30
+LABEL_FS = 26
+TICK_FS  = 24
 LINE_WIDTH = 4
+
+TITLE_FS_EP = 18
+LABEL_FS_EP = 16
+TICK_FS_EP  = 14
+
 
 ###############################################################################
 # TRAINING CURVES (from the monitor CSV, we plot the ep length + ep return)
@@ -189,10 +222,10 @@ def plot_training_curves(run_dir: str, ma_window: int = 50):
     if len(ma_len) > 0:
         x_ma = timesteps[ma_window - 1 :]
         plt.plot(x_ma, ma_len)
-    plt.title(f"{EVAL_POLICY} {LEARNING_ALG} Ep Len", fontsize=TITLE_FS)
-    plt.xlabel("timesteps", fontsize=LABEL_FS)
-    plt.ylabel("Episode Length", fontsize=LABEL_FS)
-    plt.tick_params(axis="both", labelsize=TICK_FS)
+    plt.title(f"{EVAL_POLICY} {LEARNING_ALG} Ep Len", fontsize=TITLE_FS_EP)
+    plt.xlabel("timesteps", fontsize=LABEL_FS_EP)
+    plt.ylabel("Episode Length", fontsize=LABEL_FS_EP)
+    plt.tick_params(axis="both", labelsize=TICK_FS_EP)
     plt.tight_layout()
     out_len = os.path.join(run_dir, "training_ep_len.png")
     plt.savefig(out_len, dpi=300)
@@ -205,10 +238,10 @@ def plot_training_curves(run_dir: str, ma_window: int = 50):
     if len(ma_ret) > 0:
         x_ma = timesteps[ma_window - 1 :]
         plt.plot(x_ma, ma_ret)
-    plt.title(f"{EVAL_POLICY} {LEARNING_ALG} Ep Return", fontsize=TITLE_FS)
-    plt.xlabel("timesteps", fontsize=LABEL_FS)
-    plt.ylabel("Episode Return", fontsize=LABEL_FS)
-    plt.tick_params(axis="both", labelsize=TICK_FS)
+    plt.title(f"{EVAL_POLICY} {LEARNING_ALG} Ep Return", fontsize=TITLE_FS_EP)
+    plt.xlabel("timesteps", fontsize=LABEL_FS_EP)
+    plt.ylabel("Episode Return", fontsize=LABEL_FS_EP)
+    plt.tick_params(axis="both", labelsize=TICK_FS_EP)
     plt.tight_layout()
     out_ret = os.path.join(run_dir, "training_ep_return.png")
     plt.savefig(out_ret, dpi=300)
@@ -722,10 +755,10 @@ else:
     )
 
     plt.yticks(range(4), leg_labels)
-    plt.tick_params(axis="both", labelsize=TICK_FS)
-    plt.xlabel("time index", fontsize=LABEL_FS)
-    plt.ylabel("leg", fontsize=LABEL_FS)
-    plt.title(f"{EVAL_POLICY} footfall pattern (colored stance per leg, white = swing)", fontsize=TITLE_FS)
+    plt.tick_params(axis="both", labelsize=TITLE_FS_EP)
+    plt.xlabel("time index", fontsize=LABEL_FS_EP)
+    plt.ylabel("leg", fontsize=LABEL_FS_EP)
+    plt.title(f"{EVAL_POLICY} footfall pattern (colored stance per leg, white = swing)", fontsize=TITLE_FS_EP)
     plt.tight_layout()
     plt.savefig(os.path.join(log_dir, "rollout_footfall_pattern.png"), dpi=300)
     plt.close()
