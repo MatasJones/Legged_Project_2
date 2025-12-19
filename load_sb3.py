@@ -86,7 +86,6 @@ env_config = {
     "task_env": "FWD_LOCOMOTION",
     "test_flagrun": False,
     "cpg_gait": "TROT",
-    "slope_pitch": 0.2,
 }
 
 if EVAL_POLICY == "VEL_TROT":
