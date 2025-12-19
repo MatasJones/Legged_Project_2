@@ -14,11 +14,12 @@ from utils.file_utils import get_latest_model
 # USER SETTINGS
 ###############################################################################
 LEARNING_ALG = "PPO" 
-EVAL_POLICY  = "VEL_TROT"  # Options: "VEL_TROT" or "VEL_WALK"
-MIN_GOOD_TIME_S = 10.0      # Duration of the stability test
+EVAL_POLICY  = "VEL_TROT"  # "VEL_TROT" or "VEL_WALK"
+N_TRIALS     = 10          # Number of trials to average
+MIN_GOOD_TIME_S = 10.0     # Duration per trial
 
 # Formal Plotting Constants
-TITLE_FS, LABEL_FS, TICK_FS = 28, 22, 20
+TITLE_FS, LABEL_FS, TICK_FS = 34, 28, 26
 PRIMARY_COLOR   = '#2C3E50'   # Formal Navy
 SECONDARY_COLOR = '#E74C3C'   # Formal Red
 
@@ -28,7 +29,7 @@ output_dir = "extra plots"
 os.makedirs(output_dir, exist_ok=True)
 
 ###############################################################################
-# ENV CONFIGURATION (Strictly Velocity Focused)
+# ENV CONFIGURATION
 ###############################################################################
 env_config = {
     "motor_control_mode": "CPG",
@@ -36,14 +37,14 @@ env_config = {
     "on_rack": False,
     "render": False,
     "record_video": False,
-    "add_noise": True,         # Using environment's internal noise
+    "add_noise": True,         # Internal noise enabled
     "task_env": "FWD_LOCOMOTION",
     "terrain": None,
     "cpg_gait": "WALK" if "WALK" in EVAL_POLICY else "TROT",
 }
 
 ###############################################################################
-# NORMALIZATION LOGIC
+# NORMALIZATION
 ###############################################################################
 def load_obs_normalizer(stats_file):
     if not os.path.exists(stats_file):
@@ -66,81 +67,89 @@ def normalize_obs(obs):
     return np.clip(obs, -clip, clip)
 
 ###############################################################################
-# MAIN EXECUTION
+# DATA COLLECTION (MULTI-TRIAL)
 ###############################################################################
 def main():
-    # 1. Load Model
     m_path = get_latest_model(log_dir)
     print(f"Loading model: {m_path}")
     model = (PPO if LEARNING_ALG == "PPO" else SAC).load(m_path)
     
-    # 2. Setup Env
-    env = QuadrupedGymEnv(**env_config)
-    obs, _ = env.reset()
-    
-    history = {"t": [], "vx": []}
-    
-    # 3. Data Collection Loop
-    print(f"Running {MIN_GOOD_TIME_S}s stability rollout (Noise: ON)...")
-    while env.get_sim_time() < MIN_GOOD_TIME_S:
-        obs_n = normalize_obs(obs)
-        action, _ = model.predict(obs_n, deterministic=True)
-        obs, _, terminated, truncated, _ = env.step(action)
+    # To store time-series from all trials
+    # We will interpolate to a common time grid to ensure alignment
+    common_t = np.linspace(0, MIN_GOOD_TIME_S, 500) 
+    all_v_interp = []
+
+    print(f"--- Starting {N_TRIALS} Averaged Stability Trials for {EVAL_POLICY} ---")
+
+    for i in range(N_TRIALS):
+        env = QuadrupedGymEnv(**env_config)
+        obs, _ = env.reset()
+        trial_t, trial_v = [], []
+
+        while env.get_sim_time() < MIN_GOOD_TIME_S:
+            obs_n = normalize_obs(obs)
+            action, _ = model.predict(obs_n, deterministic=True)
+            obs, _, terminated, truncated, _ = env.step(action)
+            
+            trial_t.append(env.get_sim_time())
+            trial_v.append(env.robot.GetBaseLinearVelocity()[0])
+            
+            if terminated or truncated: break
         
-        # Get physics-engine ground truth velocity
-        base_vel = env.robot.GetBaseLinearVelocity()
-        history["t"].append(env.get_sim_time())
-        history["vx"].append(base_vel[0])
+        # Interpolate results to common time grid for averaging
+        v_interp = np.interp(common_t, trial_t, trial_v)
+        all_v_interp.append(v_interp)
         
-        if terminated or truncated:
-            print("Warning: Episode ended prematurely.")
-            break
+        env.close()
+        print(f"Trial {i+1}/{N_TRIALS} complete.")
 
-    env.close()
+    # Convert to numpy for stats
+    all_v_interp = np.array(all_v_interp)
+    mean_v = np.mean(all_v_interp, axis=0)
+    std_v  = np.std(all_v_interp, axis=0)
 
-    # 4. Processing Results
-    t = np.array(history["t"])
-    vx = np.array(history["vx"])
-    
-    # Filter for steady-state (ignore 0s-2s acceleration)
-    steady_mask = (t > 2.0)
-    if np.any(steady_mask):
-        avg_v = np.mean(vx[steady_mask])
-        std_v = np.std(vx[steady_mask])
-    else:
-        avg_v, std_v = 0, 0
+    # Calculate overall metrics for the steady-state period (t > 2.0s)
+    steady_mask = common_t > 2.0
+    final_avg = np.mean(mean_v[steady_mask])
+    final_std = np.mean(std_v[steady_mask]) # Mean deviation across trials
 
-    # 5. Professional Plotting
+    ###############################################################################
+    # PROFESSIONAL PLOTTING
+    ###############################################################################
     
-    plt.figure(figsize=(14, 8))
+    plt.figure(figsize=(16, 9))
     
-    # Raw velocity line
-    plt.plot(t, vx, color=PRIMARY_COLOR, lw=3, label='Forward Velocity ($v_x$)')
+    # Plot Shaded Variance (Standard Deviation across trials)
+    plt.fill_between(common_t, mean_v - std_v, mean_v + std_v, 
+                     color=SECONDARY_COLOR, alpha=0.2, label=f'Inter-trial Deviation ($\pm 1 \sigma$)')
     
-    # Mean and Standard Deviation (Stability Area)
-    plt.axhline(y=avg_v, color=SECONDARY_COLOR, ls='--', lw=3, 
-                label=f'Mean Cruising Speed: {avg_v:.2f} m/s')
-    plt.fill_between(t, avg_v - std_v, avg_v + std_v, color=SECONDARY_COLOR, 
-                    alpha=0.15, label=f'Velocity Jitter ($\pm 1 \sigma = {std_v:.3f}$)')
+    # Plot Mean Trajectory
+    plt.plot(common_t, mean_v, color=PRIMARY_COLOR, lw=4, label='Mean Velocity ($v_x$)')
+    
+    # Plot horizontal reference for cruising speed
+    plt.axhline(y=final_avg, color=SECONDARY_COLOR, ls='--', lw=3, alpha=0.8,
+                label=f'Avg Cruising Speed: {final_avg:.2f} m/s')
 
     # Formatting
-    plt.title(f"Velocity Stability Profile: {EVAL_POLICY} (Noisy)", fontsize=TITLE_FS, fontweight='bold', pad=20)
+    plt.title(f"Averaged Velocity Stability: {EVAL_POLICY} ($n={N_TRIALS}$)", 
+              fontsize=TITLE_FS, fontweight='bold', pad=30)
     plt.xlabel("Time (s)", fontsize=LABEL_FS)
-    plt.ylabel("Velocity (m/s)", fontsize=LABEL_FS)
+    plt.ylabel("Forward Velocity (m/s)", fontsize=LABEL_FS)
     plt.xticks(fontsize=TICK_FS)
     plt.yticks(fontsize=TICK_FS)
-    plt.grid(True, alpha=0.3, ls='--')
-    plt.legend(fontsize=16, loc='lower right')
+    plt.grid(True, alpha=0.2, ls='--')
+    plt.legend(fontsize=22, loc='lower right', frameon=True, shadow=True)
     
-    # Clean spines
+    # Layout adjustment
     ax = plt.gca()
     for spine in ax.spines.values():
         spine.set_linewidth(2)
-
     plt.tight_layout()
-    save_path = os.path.join(output_dir, f"stability_{EVAL_POLICY}.png")
+
+    save_path = os.path.join(output_dir, f"avg_stability_{EVAL_POLICY}.png")
     plt.savefig(save_path, dpi=300)
-    print(f"Showcase plot saved to: {save_path}")
+    print(f"\nAnalysis complete. Save path: {save_path}")
+    print(f"Results: Mean={final_avg:.3f} m/s, Average Noise Deviation={final_std:.3f}")
 
 if __name__ == "__main__":
     main()
