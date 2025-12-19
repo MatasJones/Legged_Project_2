@@ -138,6 +138,8 @@ class QuadrupedGymEnv(gym.Env):
       terrain=None,
       test_flagrun=False,
       cpg_gait="TROT",
+      stair_height=0.05,
+      slope_pitch=0.2,
       **kwargs): # any extra arguments from legacy
     """Initialize the quadruped gym environment.
     Args:
@@ -198,6 +200,10 @@ class QuadrupedGymEnv(gym.Env):
     self._last_frame_time = 0.0 # for rendering 
     self._MAX_EP_LEN = EPISODE_LENGTH # max sim time in seconds, arbitrary
     self._action_bound = 1.0
+
+    # parameters for stairs and slopes
+    self._stair_height = stair_height
+    self._slope_pitch = slope_pitch
 
     # if using CPG
     self.setupCPG()
@@ -689,9 +695,9 @@ class QuadrupedGymEnv(gym.Env):
 
       if self._terrain is not None:
         if self._terrain == "SLOPES":
-          self.add_slopes(pitch=0.2)
+          self.add_slopes(pitch=self._slope_pitch)
         elif self._terrain == "STAIRS":
-          self.add_stairs(num_stairs=12, stair_height=0.05, stair_width=0.25)
+          self.add_stairs(num_stairs=12, stair_height=self._stair_height, stair_width=0.25)
         elif self._terrain == "GAPS":
           self.add_gaps(num_gaps=5, gap_width=0.1, between_gaps_width=2)
         elif self._terrain == "RANDOM":

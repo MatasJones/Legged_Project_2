@@ -58,6 +58,7 @@ env_config = {
     "task_env": "FWD_LOCOMOTION",
     "test_flagrun": False,
     "cpg_gait": "TROT",
+    "slope_pitch": 0.3,
 }
 
 if EVAL_POLICY == "VEL_TROT":
@@ -90,6 +91,11 @@ else:
 stats_path = os.path.join(log_dir, "vec_normalize.pkl")
 model_path = get_latest_model(log_dir)
 print("Latest model file:", model_path)
+
+TITLE_FS = 22
+LABEL_FS = 20
+TICK_FS  = 18
+LINE_WIDTH = 4
 
 ###############################################################################
 # TRAINING CURVES (from the monitor CSV, we plot the ep length + ep return)
@@ -176,12 +182,8 @@ def plot_training_curves(run_dir: str, ma_window: int = 50):
 
     timesteps, ep_returns, ep_lengths = data
 
-    TITLE_FS = 16
-    LABEL_FS = 14
-    TICK_FS  = 12
-
     # Episode length
-    plt.figure(figsize=(12, 2.6))
+    plt.figure(figsize=(8, 2.6))
     plt.scatter(timesteps, ep_lengths, s=6)
     ma_len = _moving_average(ep_lengths.astype(float), ma_window)
     if len(ma_len) > 0:
@@ -193,11 +195,11 @@ def plot_training_curves(run_dir: str, ma_window: int = 50):
     plt.tick_params(axis="both", labelsize=TICK_FS)
     plt.tight_layout()
     out_len = os.path.join(run_dir, "training_ep_len.png")
-    plt.savefig(out_len, dpi=200)
+    plt.savefig(out_len, dpi=300)
     plt.close()
 
     # Episode return
-    plt.figure(figsize=(12, 2.6))
+    plt.figure(figsize=(8, 2.6))
     plt.scatter(timesteps, ep_returns, s=6)
     ma_ret = _moving_average(ep_returns.astype(float), ma_window)
     if len(ma_ret) > 0:
@@ -209,7 +211,7 @@ def plot_training_curves(run_dir: str, ma_window: int = 50):
     plt.tick_params(axis="both", labelsize=TICK_FS)
     plt.tight_layout()
     out_ret = os.path.join(run_dir, "training_ep_return.png")
-    plt.savefig(out_ret, dpi=200)
+    plt.savefig(out_ret, dpi=300)
     plt.close()
 
     print("Training curves saved:")
@@ -522,6 +524,7 @@ def run_one_episode():
         "final_info": info,
     }
 
+
 ###############################################################################
 # TRYING MULTIPLE EPISODES, KEEP FIRST GOOD OR BEST RETURN
 ###############################################################################
@@ -563,61 +566,63 @@ base_rpy_arr = data["rpy"]
 reward_arr = data["rew"]
 power_arr = data["power"]
 
-plt.figure()
-plt.plot(t_arr, base_pos_arr[:, 0], label="x")
-plt.plot(t_arr, base_pos_arr[:, 1], label="y")
-plt.plot(t_arr, base_pos_arr[:, 2], label="z")
-plt.xlabel("time [s]", fontsize=12)
-plt.ylabel("base position [m]", fontsize=12) 
-plt.tick_params(axis="both", labelsize=10)
-plt.legend()
-plt.title(f"{EVAL_POLICY} Base position over time over episode", fontsize=14)
+plt.figure(figsize=(18, 4))
+plt.plot(t_arr, base_pos_arr[:, 0], label="x", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_pos_arr[:, 1], label="y", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_pos_arr[:, 2], label="z", linewidth=LINE_WIDTH)
+plt.xlabel("time [s]", fontsize=LABEL_FS)
+plt.ylabel("base position [m]", fontsize=LABEL_FS) 
+plt.tick_params(axis="both", labelsize=TICK_FS)
+plt.legend(fontsize=LABEL_FS)
+plt.title(f"{EVAL_POLICY} Base position over time over episode", fontsize=TITLE_FS)
 plt.tight_layout()
-plt.savefig(os.path.join(log_dir, "rollout_base_position.png"))
+plt.savefig(os.path.join(log_dir, "rollout_base_position.png"),dpi=300)
 plt.close()
 
-plt.figure()
-plt.plot(t_arr, base_lin_vel_arr[:, 0], label="vx")
-plt.plot(t_arr, base_lin_vel_arr[:, 1], label="vy")
-plt.plot(t_arr, base_lin_vel_arr[:, 2], label="vz")
-plt.xlabel("time [s]", fontsize=12)
-plt.ylabel("base linear velocity [m/s]", fontsize=12)
-plt.tick_params(axis="both", labelsize=10)
-plt.legend()
-plt.title(f"{EVAL_POLICY} Base linear velocity over time over episode", fontsize=14)
+plt.figure(figsize=(18, 4))
+plt.plot(t_arr, base_lin_vel_arr[:, 0], label="vx", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_lin_vel_arr[:, 1], label="vy", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_lin_vel_arr[:, 2], label="vz", linewidth=LINE_WIDTH)
+plt.xlabel("time [s]", fontsize=LABEL_FS)
+plt.ylabel("base linear velocity [m/s]", fontsize=LABEL_FS)
+plt.tick_params(axis="both", labelsize=TICK_FS)
+plt.legend(fontsize=LABEL_FS)
+plt.title(f"{EVAL_POLICY} Base linear velocity over time over episode", fontsize=TITLE_FS)
 plt.tight_layout()
-plt.savefig(os.path.join(log_dir, "rollout_base_lin_vel.png"))
+plt.savefig(os.path.join(log_dir, "rollout_base_lin_vel.png"),dpi=300)
 plt.close()
 
-plt.figure()
-plt.plot(t_arr, base_rpy_arr[:, 0], label="roll")
-plt.plot(t_arr, base_rpy_arr[:, 1], label="pitch")
-plt.plot(t_arr, base_rpy_arr[:, 2], label="yaw")
-plt.xlabel("time [s]", fontsize=12)
-plt.ylabel("base RPY [rad]", fontsize=12)
-plt.tick_params(axis="both", labelsize=10)
-plt.legend()
-plt.title(f"{EVAL_POLICY} Base orientation (RPY) over time over episode", fontsize=14)
+plt.figure(figsize=(18, 4))
+plt.plot(t_arr, base_rpy_arr[:, 0], label="roll", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_rpy_arr[:, 1], label="pitch", linewidth=LINE_WIDTH)
+plt.plot(t_arr, base_rpy_arr[:, 2], label="yaw", linewidth=LINE_WIDTH)
+plt.xlabel("time [s]", fontsize=LABEL_FS)
+plt.ylabel("base RPY [rad]", fontsize=LABEL_FS)
+plt.tick_params(axis="both", labelsize=TICK_FS)
+plt.legend(fontsize=LABEL_FS)
+plt.title(f"{EVAL_POLICY} Base orientation (RPY) over time over episode", fontsize=TITLE_FS)
 plt.tight_layout()
-plt.savefig(os.path.join(log_dir, "rollout_base_rpy.png"))
+plt.savefig(os.path.join(log_dir, "rollout_base_rpy.png"),dpi=300)
 plt.close()
 
-plt.figure()
-plt.plot(t_arr[: len(reward_arr)], reward_arr)
-plt.xlabel("time [s]")
-plt.ylabel("reward")
-plt.title("Instantaneous reward over time (selected episode)")
+plt.figure(figsize=(18, 4))
+plt.plot(t_arr[: len(reward_arr)], reward_arr, linewidth=LINE_WIDTH)
+plt.xlabel("time [s]",fontsize=LABEL_FS)
+plt.ylabel("reward", fontsize=LABEL_FS)
+plt.tick_params(axis="both", labelsize=TICK_FS)
+plt.title("Instantaneous reward over time (selected episode)", fontsize=TITLE_FS)
 plt.tight_layout()
-plt.savefig(os.path.join(log_dir, "rollout_reward.png"))
+plt.savefig(os.path.join(log_dir, "rollout_reward.png"),dpi=300)
 plt.close()
 
-plt.figure()
-plt.plot(t_arr[: len(power_arr)], power_arr)
-plt.xlabel("time [s]")
-plt.ylabel("power [W]")
-plt.title("Estimated mechanical power over time (selected episode)")
+plt.figure(figsize=(18, 4))
+plt.plot(t_arr[: len(power_arr)], power_arr, linewidth=LINE_WIDTH)
+plt.xlabel("time [s]", fontsize=LABEL_FS)
+plt.ylabel("power [W]", fontsize=LABEL_FS)
+plt.tick_params(axis="both", labelsize=TICK_FS)
+plt.title("Estimated mechanical power over time (selected episode)", fontsize=TITLE_FS)
 plt.tight_layout()
-plt.savefig(os.path.join(log_dir, "rollout_power.png"))
+plt.savefig(os.path.join(log_dir, "rollout_power.png"),dpi=300)
 plt.close()
 
 ###############################################################################
@@ -701,10 +706,6 @@ else:
         "RL": "red",
     }
 
-    TITLE_FS = 16
-    LABEL_FS = 14
-    TICK_FS  = 12
-
     # initialize all cells to swing color
     rgba = np.zeros((4, img_bool.shape[1], 4), dtype=float)
     rgba[:, :, :] = mcolors.to_rgba(SWING_COLOR)
@@ -726,7 +727,7 @@ else:
     plt.ylabel("leg", fontsize=LABEL_FS)
     plt.title(f"{EVAL_POLICY} footfall pattern (colored stance per leg, white = swing)", fontsize=TITLE_FS)
     plt.tight_layout()
-    plt.savefig(os.path.join(log_dir, "rollout_footfall_pattern.png"), dpi=200)
+    plt.savefig(os.path.join(log_dir, "rollout_footfall_pattern.png"), dpi=300)
     plt.close()
 
 
@@ -792,6 +793,7 @@ print("Metrics saved:", metrics_path)
 
 print("Rollout plots saved in:", log_dir)
 print("Press Enter to close the simulator window.")
+
 input()
 env.close()
 
