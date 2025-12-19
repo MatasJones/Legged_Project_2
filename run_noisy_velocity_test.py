@@ -14,14 +14,14 @@ from utils.file_utils import get_latest_model
 # USER SETTINGS
 ###############################################################################
 LEARNING_ALG = "PPO" 
-EVAL_POLICY  = "VEL_TROT"  # "VEL_TROT" or "VEL_WALK"
+EVAL_POLICY  = "VEL_WALK"  # "VEL_TROT" or "VEL_WALK"
 N_TRIALS     = 10          # Number of trials to average
 MIN_GOOD_TIME_S = 10.0     # Duration per trial
 
 # Formal Plotting Constants
-TITLE_FS, LABEL_FS, TICK_FS = 34, 28, 26
-PRIMARY_COLOR   = '#2C3E50'   # Formal Navy
-SECONDARY_COLOR = '#E74C3C'   # Formal Red
+TITLE_FS, LABEL_FS, TICK_FS = 40, 38, 36
+PRIMARY_COLOR   = '#2C3E50'
+SECONDARY_COLOR = '#E74C3C'
 
 interm_dir = "./logs/intermediate_models/"
 log_dir    = os.path.join(interm_dir, EVAL_POLICY)
@@ -138,7 +138,7 @@ def main():
     plt.xticks(fontsize=TICK_FS)
     plt.yticks(fontsize=TICK_FS)
     plt.grid(True, alpha=0.2, ls='--')
-    plt.legend(fontsize=22, loc='lower right', frameon=True, shadow=True)
+    plt.legend(fontsize=LABEL_FS, loc='lower right', frameon=True, shadow=True)
     
     # Layout adjustment
     ax = plt.gca()

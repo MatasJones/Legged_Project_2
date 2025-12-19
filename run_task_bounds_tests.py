@@ -22,8 +22,8 @@ TITLE_FS = 28
 LABEL_FS = 22
 TICK_FS  = 20
 LINE_WIDTH = 4
-PRIMARY_COLOR = '#2C3E50'   # Formal Navy
-SECONDARY_COLOR = '#E74C3C' # Formal Red
+PRIMARY_COLOR = '#2C3E50'
+SECONDARY_COLOR = '#E74C3C'
 
 interm_dir = "./logs/intermediate_models/"
 log_dir = os.path.join(interm_dir, EVAL_POLICY)
@@ -41,7 +41,7 @@ env_config = {
     "on_rack": False,
     "render": False,
     "record_video": False,
-    "add_noise": True, # ENABLED: Environment will now inject sensor noise
+    "add_noise": True,
     "task_env": "LR_COURSE_TASK",
     "cpg_gait": "TROT",
 }

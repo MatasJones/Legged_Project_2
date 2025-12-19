@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Adjusted Formatting Flags for better fit
-TITLE_FS = 24  # Slightly reduced
-LABEL_FS = 22  # Slightly reduced
-TICK_FS  = 22  # Slightly reduced
+TITLE_FS = 24
+LABEL_FS = 22
+TICK_FS  = 22
 LINE_WIDTH = 4
 
 def load_metrics(run_name):
@@ -68,7 +68,6 @@ def plot_comparisons():
         bars = ax.bar(available_runs, values, color=colors[:len(available_runs)], 
                       edgecolor='#1B2631', linewidth=2, width=0.5)
         
-        # FIX: Dynamically set y-axis limit to 120% of max value to avoid cutting labels
         if values and max(values) > 0:
             ax.set_ylim(0, max(values) * 1.2)
         
@@ -78,7 +77,6 @@ def plot_comparisons():
         
         for bar in bars:
             height = bar.get_height()
-            # FIX: Added 'clip_on=False' to ensure text isn't cut by axes
             ax.text(bar.get_x() + bar.get_width()/2., height + (max(values)*0.02),
                     f'{height:.2f}', ha='center', va='bottom', 
                     fontsize=TICK_FS, fontweight='bold', clip_on=False)
